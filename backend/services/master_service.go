@@ -1,0 +1,126 @@
+package services
+
+import (
+	"backend/models"
+	"backend/repositories"
+)
+
+type MasterService interface {
+	// Class
+	CreateClass(name string, grade string, teacherID *uint) error
+	UpdateClass(classID uint, name string, grade string, teacherID *uint) error
+	DeleteClass(classID uint) error
+	GetAllClasses() ([]models.Class, error)
+	GetClassesByTeacher(teacherID uint) ([]models.Class, error)
+	FindClassByID(id uint) (*models.Class, error) // Added FindClassByID to interface if missing
+
+	// Subject
+	CreateSubject(name string, code string, teacherID *uint) error
+	UpdateSubject(subjectID uint, name string, code string, teacherID *uint) error
+	DeleteSubject(subjectID uint) error
+	GetAllSubjects() ([]models.Subject, error)
+
+	// Schedule
+	CreateSchedule(classID uint, subjectID uint, dayID int, timeSlotID uint, teacherID uint) error
+	UpdateSchedule(scheduleID uint, classID uint, subjectID uint, dayID int, timeSlotID uint, teacherID uint) error
+	DeleteSchedule(scheduleID uint) error
+	GetSchedules(classID string, teacherID string) ([]models.Schedule, error)
+
+	GetDays() ([]models.Day, error)
+	GetAllTimeSlots() ([]models.TimeSlot, error)
+	ResetSchedules() error
+}
+
+type masterService struct {
+	repo repositories.MasterRepository
+}
+
+func NewMasterService(repo repositories.MasterRepository) MasterService {
+	return &masterService{repo}
+}
+
+func (s *masterService) CreateClass(name string, grade string, teacherID *uint) error {
+	class := models.Class{Name: name, Grade: grade, TeacherID: teacherID}
+	return s.repo.CreateClass(&class)
+}
+
+func (s *masterService) GetAllClasses() ([]models.Class, error) {
+	return s.repo.GetAllClasses()
+}
+
+func (s *masterService) GetClassesByTeacher(teacherID uint) ([]models.Class, error) {
+	return s.repo.GetClassesByTeacher(teacherID)
+}
+
+func (s *masterService) CreateSubject(name string, code string, teacherID *uint) error {
+	subject := models.Subject{Name: name, Code: code, TeacherID: teacherID}
+	return s.repo.CreateSubject(&subject)
+}
+
+func (s *masterService) GetAllSubjects() ([]models.Subject, error) {
+	return s.repo.GetAllSubjects()
+}
+
+func (s *masterService) CreateSchedule(classID uint, subjectID uint, dayID int, timeSlotID uint, teacherID uint) error {
+	schedule := models.Schedule{
+		ClassID:    classID,
+		SubjectID:  subjectID,
+		DayID:      dayID,
+		TimeSlotID: timeSlotID,
+		TeacherID:  &teacherID,
+	}
+	return s.repo.CreateSchedule(&schedule)
+}
+
+func (s *masterService) GetSchedules(classID string, teacherID string) ([]models.Schedule, error) {
+	return s.repo.GetSchedules(classID, teacherID, 0)
+}
+
+func (s *masterService) GetDays() ([]models.Day, error) {
+	return s.repo.GetAllDays()
+}
+
+func (s *masterService) GetAllTimeSlots() ([]models.TimeSlot, error) {
+	return s.repo.GetAllTimeSlots()
+}
+
+// Update implementations
+func (s *masterService) UpdateClass(classID uint, name string, grade string, teacherID *uint) error {
+	return s.repo.UpdateClass(classID, name, grade, teacherID)
+}
+
+func (s *masterService) UpdateSubject(subjectID uint, name string, code string, teacherID *uint) error {
+	return s.repo.UpdateSubject(subjectID, name, code, teacherID)
+}
+
+func (s *masterService) UpdateSchedule(scheduleID uint, classID uint, subjectID uint, dayID int, timeSlotID uint, teacherID uint) error {
+	schedule := models.Schedule{
+		ClassID:    classID,
+		SubjectID:  subjectID,
+		DayID:      dayID,
+		TimeSlotID: timeSlotID,
+		TeacherID:  &teacherID,
+	}
+	return s.repo.UpdateSchedule(scheduleID, &schedule)
+}
+
+// Delete implementations
+func (s *masterService) DeleteClass(classID uint) error {
+	return s.repo.DeleteClass(classID)
+}
+
+func (s *masterService) DeleteSubject(subjectID uint) error {
+	return s.repo.DeleteSubject(subjectID)
+}
+
+func (s *masterService) DeleteSchedule(scheduleID uint) error {
+	return s.repo.DeleteSchedule(scheduleID)
+}
+
+func (s *masterService) FindClassByID(id uint) (*models.Class, error) {
+	return s.repo.FindClassByID(id)
+}
+
+func (s *masterService) ResetSchedules() error {
+	return s.repo.ResetSchedules()
+}

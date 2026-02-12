@@ -3,14 +3,21 @@ import { useSchedulesByDay } from '@/hooks/useSchedules';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, BookOpen, User } from 'lucide-react';
+import { Calendar, Clock, BookOpen, User, GraduationCap } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function JadwalPelajaran() {
-  const { profile } = useAuth();
-  const { data: schedulesByDay, isLoading, rawData } = useSchedulesByDay(profile?.class_id || undefined);
+  const { profile, roles, user } = useAuth();
+  const isGuru = roles.includes('guru');
 
-  const today = new Date().toLocaleDateString('id-ID', { weekday: 'long' });
+  const { data: schedulesByDay, isLoading } = useSchedulesByDay(
+    !isGuru ? (profile?.class_id?.toString() || undefined) : undefined,
+    isGuru ? (user?.id?.toString() || undefined) : undefined
+  );
+
+  const todayName = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][new Date().getDay()];
+  // If today is Saturday or Sunday, default to Monday
+  const today = (todayName === 'Sabtu' || todayName === 'Minggu') ? 'Senin' : todayName;
 
   if (isLoading) {
     return (
@@ -25,7 +32,7 @@ export default function JadwalPelajaran() {
     );
   }
 
-  if (!profile?.class_id) {
+  if (!isGuru && !profile?.class_id) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <Calendar className="h-16 w-16 text-muted-foreground mb-4" />
@@ -42,16 +49,18 @@ export default function JadwalPelajaran() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Calendar className="h-6 w-6 text-primary" />
-          Jadwal Pelajaran
+          {isGuru ? 'Jadwal Mengajar' : 'Jadwal Pelajaran'}
         </h1>
         <p className="text-muted-foreground">
-          Kelas {profile?.class?.name} - {profile?.class?.grade}
+          {isGuru
+            ? `Daftar kelas dan jam mengajar Anda`
+            : `Kelas ${profile?.class?.name || '-'} - ${profile?.class?.grade || '-'}`}
         </p>
       </div>
 
       <Tabs defaultValue={today} className="w-full">
         <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted p-1">
-          {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => (
+          {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'].map((day) => (
             <TabsTrigger
               key={day}
               value={day}
@@ -62,9 +71,9 @@ export default function JadwalPelajaran() {
           ))}
         </TabsList>
 
-        {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((day) => {
+        {['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'].map((day) => {
           const daySchedule = schedulesByDay.find((d) => d.nama_hari === day);
-          
+
           return (
             <TabsContent key={day} value={day} className="mt-6">
               {daySchedule && daySchedule.jadwal.length > 0 ? (
@@ -72,14 +81,13 @@ export default function JadwalPelajaran() {
                   {daySchedule.jadwal.map((jadwal, index) => (
                     <Card
                       key={jadwal.id}
-                      className={`shadow-elegant transition-all hover:scale-[1.02] ${
-                        day === today ? 'ring-2 ring-primary/20' : ''
-                      }`}
+                      className={`shadow-elegant transition-all hover:scale-[1.02] ${day === today ? 'ring-2 ring-primary/20' : ''
+                        }`}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <Badge variant="outline" className="text-xs">
-                            Jam ke-{index + 1}
+                            Jam ke-{jadwal.slot_number || index + 1}
                           </Badge>
                           {day === today && (
                             <Badge className="bg-primary/10 text-primary text-xs">Hari Ini</Badge>
@@ -93,8 +101,17 @@ export default function JadwalPelajaran() {
                           <span>{jadwal.jam}</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <User className="h-4 w-4" />
-                          <span>{jadwal.guru}</span>
+                          {isGuru ? (
+                            <>
+                              <GraduationCap className="h-4 w-4" />
+                              <span>Kelas: {jadwal.kelas || '-'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <User className="h-4 w-4" />
+                              <span>{jadwal.guru || '-'}</span>
+                            </>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

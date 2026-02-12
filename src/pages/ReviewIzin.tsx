@@ -27,16 +27,19 @@ import { FileText, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ReviewIzin() {
-  const { user } = useAuth();
-  const { data: pendingRequests, isLoading: loadingPending } = useAttendanceRequests(undefined, 'pending');
-  const { data: allRequests, isLoading: loadingAll } = useAttendanceRequests();
+  const { user, profile, roles } = useAuth();
+  const isGuru = roles.includes('guru');
+  const classId = isGuru ? profile?.class_id : undefined;
+
+  const { data: pendingRequests, isLoading: loadingPending } = useAttendanceRequests(undefined, 'pending', classId);
+  const { data: allRequests, isLoading: loadingAll } = useAttendanceRequests(undefined, undefined, classId);
   const reviewRequest = useReviewAttendanceRequest();
 
-  const handleReview = async (requestId: string, status: 'approved' | 'rejected') => {
+  const handleReview = async (requestId: number, status: 'approved' | 'rejected') => {
     await reviewRequest.mutateAsync({
-      requestId,
+      requestId: requestId.toString(),
       status,
-      reviewerId: user?.id || '',
+      reviewerId: user?.id?.toString() || '',
     });
   };
 
@@ -122,6 +125,14 @@ export default function ReviewIzin() {
                           <Badge variant="outline">
                             {req.request_type === 'sakit' ? 'Sakit' : 'Izin'}
                           </Badge>
+                          <Badge variant="secondary">
+                            {req.is_full_day
+                              ? "Seharian"
+                              : req.schedules && req.schedules.length > 0
+                                ? `${req.schedules.length} Jam Pelajaran`
+                                : "Sebagian Hari"
+                            }
+                          </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
                           NIS: {req.student?.nis || '-'} • Kelas: {req.student?.class?.name || '-'}
@@ -138,6 +149,18 @@ export default function ReviewIzin() {
                         <p className="text-sm">
                           <span className="font-medium">Alasan:</span> {req.reason}
                         </p>
+                        {!req.is_full_day && req.schedules && req.schedules.length > 0 && (
+                          <div className="pt-1">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase">Mapel Terkait:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {req.schedules.map(s => (
+                                <Badge key={s.id} variant="secondary" className="text-[10px] py-0 h-4">
+                                  {s.subject?.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <AlertDialog>
@@ -229,9 +252,14 @@ export default function ReviewIzin() {
                             {new Date(req.date).toLocaleDateString('id-ID')}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">
-                              {req.request_type === 'sakit' ? 'Sakit' : 'Izin'}
-                            </Badge>
+                            <div className="flex flex-col gap-1">
+                              <Badge variant="outline" className="w-fit">
+                                {req.request_type === 'sakit' ? 'Sakit' : 'Izin'}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {req.is_full_day ? "Seharian" : `${req.schedules?.length || 0} Mapel`}
+                              </span>
+                            </div>
                           </TableCell>
                           <TableCell className="max-w-xs truncate">
                             {req.reason}

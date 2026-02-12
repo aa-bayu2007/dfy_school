@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAttendanceStats } from '@/hooks/useAttendance';
+import { apiClient } from '@/lib/api-client';
+import { useAttendanceStats, useAttendanceRecap } from '@/hooks/useAttendance';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+// Migrated to Go Backend
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ClipboardList, Download, FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
+import { ClipboardList, Download, FileSpreadsheet, FileText as FilePdf, CheckCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -28,21 +29,35 @@ import autoTable from 'jspdf-autotable';
 import { Class } from '@/types/database';
 
 export default function RekapAbsensi() {
-  const { roles } = useAuth();
+  const { roles, profile, user } = useAuth();
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
+  const isAdmin = roles.includes('admin');
+  const isGuru = roles.includes('guru');
+
   const { data: classes } = useQuery({
-    queryKey: ['classes'],
+    queryKey: ['classes', isGuru ? user?.id : 'all'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('classes').select('*').order('name');
-      if (error) throw error;
-      return data as Class[];
+      const url = isGuru
+        ? `/classes?teacher_id=${user?.id}`
+        : `/classes`;
+      return apiClient.get<Class[]>(url);
     },
   });
 
-  const { data: stats, isLoading } = useAttendanceStats(
+  // Auto-select Wali Kelas class
+  useEffect(() => {
+    if (isGuru && profile?.class_id && classes && classes.length > 0 && !selectedClass) {
+      const classExists = classes.some(c => c.id === profile.class_id);
+      if (classExists) {
+        setSelectedClass(profile.class_id.toString());
+      }
+    }
+  }, [isGuru, profile?.class_id, classes, selectedClass]);
+
+  const { data: stats, isLoading } = useAttendanceRecap(
     selectedClass || undefined,
     selectedMonth,
     selectedYear
@@ -61,7 +76,7 @@ export default function RekapAbsensi() {
     const worksheet = XLSX.utils.json_to_sheet(
       stats.map((s: any, idx: number) => ({
         No: idx + 1,
-        Nama: s.student?.full_name || '-',
+        Nama: s.student?.name || s.student?.full_name || '-',
         NIS: s.student?.nis || '-',
         Kelas: s.student?.class?.name || '-',
         Hadir: s.hadir,
@@ -82,7 +97,7 @@ export default function RekapAbsensi() {
     if (!stats || stats.length === 0) return;
 
     const doc = new jsPDF();
-    
+
     doc.setFontSize(16);
     doc.text('Rekap Absensi', 14, 22);
     doc.setFontSize(10);
@@ -93,7 +108,7 @@ export default function RekapAbsensi() {
       head: [['No', 'Nama', 'NIS', 'Hadir', 'Sakit', 'Izin', 'Alpha', '%']],
       body: stats.map((s: any, idx: number) => [
         idx + 1,
-        s.student?.full_name || '-',
+        s.student?.name || s.student?.full_name || '-',
         s.student?.nis || '-',
         s.hadir,
         s.sakit,
@@ -130,7 +145,7 @@ export default function RekapAbsensi() {
                 </SelectTrigger>
                 <SelectContent>
                   {classes?.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
+                    <SelectItem key={cls.id} value={cls.id.toString()}>
                       {cls.name} - {cls.grade}
                     </SelectItem>
                   ))}
@@ -231,7 +246,10 @@ export default function RekapAbsensi() {
                   {stats.map((s: any, idx: number) => (
                     <TableRow key={s.student?.id || idx}>
                       <TableCell>{idx + 1}</TableCell>
-                      <TableCell className="font-medium">{s.student?.full_name}</TableCell>
+                      <TableCell className={`font-medium ${(s.hadir / s.total) === 1 ? 'text-success font-bold' : ''}`}>
+                        {s.student?.full_name || s.student?.name || 'Siswa'}
+                        {(s.hadir / s.total) === 1 && <CheckCircle className="inline-block h-3 w-3 ml-1" />}
+                      </TableCell>
                       <TableCell>{s.student?.nis || '-'}</TableCell>
                       <TableCell className="text-center text-success font-medium">
                         {s.hadir}

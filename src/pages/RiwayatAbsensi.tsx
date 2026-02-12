@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAttendance } from '@/hooks/useAttendance';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -11,12 +11,33 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ClipboardList, CheckCircle, XCircle, AlertCircle, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Search,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
+  ClipboardList,
+  Users,
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useLocation } from 'react-router-dom';
 
 export default function RiwayatAbsensi() {
-  const { user } = useAuth();
-  const { data: attendances, isLoading } = useAttendance(user?.id);
+  const { user, profile, roles } = useAuth();
+  const location = useLocation();
+  const isClassView = location.pathname === '/dashboard/absensi-kelas';
+
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [searchName, setSearchName] = useState<string>('');
+
+  const { data: attendances, isLoading } = useAttendance(
+    isClassView ? undefined : user?.id,
+    isClassView ? (profile?.class_id || undefined) : undefined,
+    selectedDate || undefined
+  );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -58,28 +79,50 @@ export default function RiwayatAbsensi() {
     }
   };
 
-  // Group attendance by month
-  const groupedByMonth = attendances?.reduce((acc, att) => {
-    const month = new Date(att.date).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-    });
-    if (!acc[month]) {
-      acc[month] = [];
-    }
-    acc[month].push(att);
-    return acc;
-  }, {} as Record<string, typeof attendances>);
+  // Filter attendances client-side for name search
+  const filteredAttendances = attendances?.filter(att => {
+    if (!searchName) return true;
+    const name = att.student?.full_name || att.student?.name || '';
+    return name.toLowerCase().includes(searchName.toLowerCase());
+  }) || [];
 
-  // Calculate stats
-  const stats = attendances?.reduce(
-    (acc, att) => {
-      acc[att.status] = (acc[att.status] || 0) + 1;
-      acc.total++;
-      return acc;
-    },
-    { hadir: 0, sakit: 0, izin: 0, alpha: 0, pending: 0, total: 0 }
-  );
+  // Calculate stats based on students and dates (One per day, mutually exclusive)
+  const stats = (() => {
+    if (!filteredAttendances.length) return { hadir: 0, sakit: 0, izin: 0, alpha: 0, pending: 0, total: 0 };
+
+    // Map student-date to their highest priority status
+    const dayStatusMap = new Map<string, string>();
+    const uniqueStudentDays = new Set<string>();
+
+    filteredAttendances.forEach(att => {
+      const d = new Date(att.date);
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      // Use student_id, falling back to nested student.id, or even student.name to ensure we group correctly
+      const studentId = att.student_id || att.student?.id || att.student?.name;
+
+      // If we somehow still don't have an ID, we can't group effectively, but this combination should remain unique per student-day
+      const uniqueKey = `${studentId}-${dateKey}`;
+      uniqueStudentDays.add(uniqueKey);
+
+      const current = dayStatusMap.get(uniqueKey);
+      // Priority: hadir > sakit/izin > alpha/pending
+      if (!current || att.status === 'hadir' || (current === 'alpha' && (att.status === 'sakit' || att.status === 'izin'))) {
+        dayStatusMap.set(uniqueKey, att.status);
+      }
+    });
+
+    const counts = { hadir: 0, sakit: 0, izin: 0, alpha: 0, pending: 0, total: 0 };
+    dayStatusMap.forEach(status => {
+      const s = status as keyof typeof counts;
+      if (counts.hasOwnProperty(s)) {
+        counts[s]++;
+      }
+      counts.total++;
+    });
+
+    return counts;
+  })();
 
   if (isLoading) {
     return (
@@ -99,12 +142,65 @@ export default function RiwayatAbsensi() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ClipboardList className="h-6 w-6 text-primary" />
-          Riwayat Absensi
+          {isClassView ? (
+            <Users className="h-6 w-6 text-primary" />
+          ) : (
+            <ClipboardList className="h-6 w-6 text-primary" />
+          )}
+          {isClassView ? 'Absensi Kelas' : 'Riwayat Absensi'}
         </h1>
         <p className="text-muted-foreground">
-          Rekap kehadiran Anda
+          {isClassView
+            ? `Daftar kehadiran siswa kelas ${profile?.class?.name || '...'}`
+            : 'Rekap kehadiran Anda'}
         </p>
+      </div>
+
+      {/* Filter Section */}
+      <div className="flex flex-wrap items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
+        {/* Date Filter */}
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">Filter Tanggal:</span>
+        </div>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="bg-background border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+        />
+
+        {/* Name Filter (Only for Class View / Admin / Teachers) */}
+        {(isClassView || roles.includes('admin') || roles.includes('guru') || roles.includes('ketua_kelas')) && (
+          <>
+            <div className="h-4 w-px bg-border mx-2" />
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Cari Siswa:</span>
+            </div>
+            <input
+              type="text"
+              placeholder="Nama siswa..."
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              className="bg-background border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all w-48"
+            />
+          </>
+        )}
+
+        {(selectedDate || searchName) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSelectedDate('');
+              setSearchName('');
+            }}
+            className="text-xs h-8 ml-auto"
+          >
+            Reset Filter
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -164,42 +260,95 @@ export default function RiwayatAbsensi() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {attendances && attendances.length > 0 ? (
+          {filteredAttendances && filteredAttendances.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tanggal</TableHead>
+                    <TableHead className="w-[150px]">Tanggal</TableHead>
+                    {isClassView && <TableHead>Siswa</TableHead>}
                     <TableHead>Mata Pelajaran</TableHead>
                     <TableHead>Jam</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Catatan</TableHead>
+                    <TableHead>Waktu Scan</TableHead>
+                    {(isClassView || roles.includes('admin') || roles.includes('guru')) && <TableHead>Petugas</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attendances.map((att) => (
-                    <TableRow key={att.id}>
-                      <TableCell>
-                        {new Date(att.date).toLocaleDateString('id-ID', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {att.schedule?.subject?.name || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {att.schedule?.time_slot?.start_time?.slice(0, 5)} -{' '}
-                        {att.schedule?.time_slot?.end_time?.slice(0, 5)}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(att.status)}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {att.notes || '-'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {[...filteredAttendances]
+                    .sort((a, b) => {
+                      const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+                      if (dateCompare !== 0) return dateCompare;
+                      return (a.schedule?.time_slot?.start_time || '').localeCompare(b.schedule?.time_slot?.start_time || '');
+                    })
+                    .map((att) => (
+                      <TableRow key={att.id} className="hover:bg-muted/5 transition-colors border-b border-border/40">
+                        <TableCell className="py-4 font-bold text-sm text-primary">
+                          {new Date(att.date).toLocaleDateString('id-ID', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short'
+                          })}
+                        </TableCell>
+                        {isClassView && (
+                          <TableCell className="py-4 font-bold text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary">
+                                {(att.student?.full_name || att.student?.name || 'S')?.charAt(0)}
+                              </div>
+                              {att.student?.full_name || att.student?.name || 'Siswa'}
+                            </div>
+                          </TableCell>
+                        )}
+                        <TableCell className="py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm tracking-tight text-foreground">
+                              {att.schedule?.subject?.name || 'Harian'}
+                            </span>
+                            {!isClassView && (
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium">
+                                {att.schedule?.day?.name || 'Harian'}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          {att.schedule?.time_slot ? (
+                            <Badge variant="secondary" className="font-mono text-[10px] bg-muted/50 border-transparent">
+                              {att.schedule.time_slot.start_time.slice(0, 5)} - {att.schedule.time_slot.end_time.slice(0, 5)}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs font-medium italic">Full Day</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-4">{getStatusBadge(att.status)}</TableCell>
+                        <TableCell className="py-4">
+                          {att.scanned_at ? (
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                              <Clock className="h-3 w-3 opacity-60" />
+                              {new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs opacity-40">-</span>
+                          )}
+                        </TableCell>
+                        {(isClassView || roles.includes('admin') || roles.includes('guru')) && (
+                          <TableCell className="py-4">
+                            {att.scanner ? (
+                              <div className="flex items-center gap-1.5">
+                                <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20 text-primary px-1.5 py-0">
+                                  {att.scanner.full_name || att.scanner.name || 'Petugas'}
+                                </Badge>
+                              </div>
+                            ) : att.notes === "Auto-generated" ? (
+                              <span className="text-[10px] text-muted-foreground italic">Sistem</span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground opacity-40">-</span>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </div>
@@ -207,7 +356,7 @@ export default function RiwayatAbsensi() {
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
-                Belum ada data kehadiran
+                Belum ada data kehadiran untuk periode ini
               </p>
             </div>
           )}

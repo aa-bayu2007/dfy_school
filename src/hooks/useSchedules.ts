@@ -1,33 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { ScheduleWithDetails, Day } from '@/types/database';
+import { apiClient } from '@/lib/api-client';
 
-export function useSchedules(classId?: string) {
+export function useSchedules(classId?: string, teacherId?: string) {
   return useQuery({
-    queryKey: ['schedules', classId],
+    queryKey: ['schedules', classId, teacherId],
     queryFn: async () => {
-      let query = supabase
-        .from('schedules')
-        .select(`
-          *,
-          day:days(*),
-          time_slot:time_slots(*),
-          subject:subjects(*),
-          class:classes(*),
-          teacher:profiles(*)
-        `)
-        .order('day_id')
-        .order('time_slot_id');
+      const params = new URLSearchParams();
+      if (classId) params.append('class_id', classId);
+      if (teacherId) params.append('teacher_id', teacherId);
 
-      if (classId) {
-        query = query.eq('class_id', classId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as unknown as ScheduleWithDetails[];
+      const data = await apiClient.get<any[]>(`/schedules?${params.toString()}`);
+      return data.map(s => ({
+        ...s,
+        teacher: s.teacher ? {
+          ...s.teacher,
+          full_name: s.teacher.profile?.full_name || s.teacher.name,
+          nip: s.teacher.profile?.nip
+        } : null
+      })) as ScheduleWithDetails[];
     },
-    enabled: !!classId,
+    enabled: !!classId || !!teacherId,
   });
 }
 
@@ -35,21 +28,16 @@ export function useDays() {
   return useQuery({
     queryKey: ['days'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('days')
-        .select('*')
-        .order('id');
-      if (error) throw error;
-      return data as Day[];
+      return apiClient.get<Day[]>('/days');
     },
   });
 }
 
-export function useSchedulesByDay(classId?: string) {
-  const { data: schedules, ...rest } = useSchedules(classId);
+export function useSchedulesByDay(classId?: string, teacherId?: string) {
+  const { data: schedules, ...rest } = useSchedules(classId, teacherId);
 
   const groupedSchedules = schedules?.reduce((acc, schedule) => {
-    const dayName = schedule.day?.name || 'Unknown';
+    const dayName = (schedule.day?.name || 'Unknown').trim();
     if (!acc[dayName]) {
       acc[dayName] = {
         id: schedule.day_id,
@@ -58,14 +46,15 @@ export function useSchedulesByDay(classId?: string) {
       };
     }
     acc[dayName].jadwal.push({
-      id: schedule.id,
+      id: schedule.id.toString(),
       jam: `${schedule.time_slot?.start_time?.slice(0, 5)}-${schedule.time_slot?.end_time?.slice(0, 5)}`,
       mapel: schedule.subject?.name || '',
       kelas: schedule.class?.name || '',
-      guru: schedule.teacher?.full_name || '-',
+      guru: schedule.teacher?.full_name || schedule.teacher?.name || '-',
+      slot_number: schedule.time_slot?.slot_number,
     });
     return acc;
-  }, {} as Record<string, { id: number; nama_hari: string; jadwal: Array<{ id: string; jam: string; mapel: string; kelas: string; guru: string }> }>);
+  }, {} as Record<string, { id: number; nama_hari: string; jadwal: Array<{ id: string; jam: string; mapel: string; kelas: string; guru: string; slot_number?: number }> }>);
 
   return {
     ...rest,

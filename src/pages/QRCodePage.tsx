@@ -8,8 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 
 export default function QRCodePage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { data: qrCode, isLoading, refetch } = useStudentQRCode(user?.id);
+
+  // Use student data from QR code response if available for most up-to-date info
+  const studentInfo = qrCode?.student || null;
 
   const today = new Date().toLocaleDateString('id-ID', {
     weekday: 'long',
@@ -44,10 +47,11 @@ export default function QRCodePage() {
       <div className="flex justify-center">
         <Card className="max-w-md w-full shadow-elegant">
           <CardHeader className="text-center">
-            <CardTitle>{profile?.full_name}</CardTitle>
+            <CardTitle>{studentInfo?.name || "Memuat..."}</CardTitle>
             <CardDescription>
-              {profile?.nis && `NIS: ${profile.nis}`}
-              {profile?.class?.name && ` • Kelas ${profile.class.name}`}
+              {studentInfo?.nis && `NIS: ${studentInfo.nis}`}
+              {studentInfo?.class?.name && ` • Kelas ${studentInfo.class.name}`}
+              {!studentInfo?.class?.name && " • Belum ada kelas"}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-6">
@@ -55,8 +59,8 @@ export default function QRCodePage() {
               {qrCode ? (
                 <QRCodeSVG
                   value={qrCode.qr_code}
-                  size={220}
-                  level="H"
+                  size={256}
+                  level="M"
                   includeMargin
                   className="rounded-lg"
                 />

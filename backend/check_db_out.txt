@@ -1,0 +1,22 @@
+﻿Database connected!
+--- Advanced Database Check ---
+Total Classes: 6
+  - X PPLG 1 (ID: 1), Wali Kelas: Budi Santoso
+  - X PPLG 2 (ID: 2), Wali Kelas: Budi Santoso
+  - XI PPLG 1 (ID: 3), Wali Kelas: Budi Santoso
+  - XI PPLG 2 (ID: 4), Wali Kelas: Budi Santoso
+  - XII PPLG 1 (ID: 5), Wali Kelas: Budi Santoso
+  - XII PPLG 2 (ID: 6), Wali Kelas: Budi Santoso
+
+Today: Tuesday (DayID: 2)
+Total Schedules in DB: 75
+Schedules today: 15
+  Example schedule today:
+  - Class: X PPLG 1, Subject: Pemrograman Perangkat Lunak
+
+Student: Ahmad Ketua (ID: 3)
+  - Class: XII PPLG 1 (ID: 5)
+  - NIS: 20241000
+  - Schedules for Ahmad today: 3
+
+Scanner Guru: Budi Santoso (ID: 2, Role: guru)

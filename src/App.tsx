@@ -21,6 +21,7 @@ import KelolaKelas from "./pages/admin/KelolaKelas";
 import KelolaMapel from "./pages/admin/KelolaMapel";
 import KelolaUsers from "./pages/admin/KelolaUsers";
 import KelolaJadwal from "./pages/admin/KelolaJadwal";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,15 +32,16 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            
+
             <Route element={<ProtectedRoute />}>
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard/profile" element={<Profile />} />
                 <Route path="/dashboard/jadwal" element={<JadwalPelajaran />} />
                 <Route path="/dashboard/qr-code" element={<QRCodePage />} />
                 <Route path="/dashboard/absensi" element={<RiwayatAbsensi />} />
@@ -54,7 +56,7 @@ const App = () => (
                 <Route path="/dashboard/kelola-jadwal" element={<KelolaJadwal />} />
               </Route>
             </Route>
-            
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

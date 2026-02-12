@@ -3,27 +3,30 @@ export type AttendanceStatus = 'hadir' | 'sakit' | 'izin' | 'alpha' | 'pending';
 export type RequestStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Profile {
-  id: string;
+  id: number;
+  name: string;
   full_name: string;
   nis?: string;
   nip?: string;
-  class_id?: string;
+  class_id?: number;
   phone?: string;
   address?: string;
   avatar_url?: string;
   created_at: string;
   updated_at: string;
+  email?: string;
+  role?: string;
   class?: Class;
 }
 
 export interface UserRole {
-  id: string;
-  user_id: string;
+  id: number;
+  user_id: number;
   role: AppRole;
 }
 
 export interface Class {
-  id: string;
+  id: number;
   name: string;
   grade: string;
   created_at: string;
@@ -31,10 +34,13 @@ export interface Class {
 }
 
 export interface Subject {
-  id: string;
+  id: number;
   name: string;
   code?: string;
+  teacher_id?: number;
+  teacher?: Profile;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Day {
@@ -43,7 +49,7 @@ export interface Day {
 }
 
 export interface TimeSlot {
-  id: string;
+  id: number;
   slot_number: number;
   start_time: string;
   end_time: string;
@@ -51,12 +57,12 @@ export interface TimeSlot {
 }
 
 export interface Schedule {
-  id: string;
+  id: number;
   day_id: number;
-  time_slot_id: string;
-  subject_id: string;
-  class_id: string;
-  teacher_id?: string;
+  time_slot_id: number;
+  subject_id: number;
+  class_id: number;
+  teacher_id?: number;
   created_at: string;
   day?: Day;
   time_slot?: TimeSlot;
@@ -66,8 +72,8 @@ export interface Schedule {
 }
 
 export interface DailyQRCode {
-  id: string;
-  student_id: string;
+  id: number;
+  student_id: number;
   qr_code: string;
   date: string;
   is_used: boolean;
@@ -76,38 +82,42 @@ export interface DailyQRCode {
 }
 
 export interface Attendance {
-  id: string;
-  student_id: string;
-  schedule_id: string;
+  id: number;
+  student_id: number;
+  schedule_id: number;
   date: string;
   status: AttendanceStatus;
-  scanned_by?: string;
+  scanned_by?: number;
   scanned_at?: string;
   notes?: string;
   created_at: string;
+  updated_at?: string;
   student?: Profile;
   schedule?: Schedule;
   scanner?: Profile;
 }
 
 export interface AttendanceRequest {
-  id: string;
-  student_id: string;
+  id: number;
+  student_id: number;
   date: string;
   request_type: 'sakit' | 'izin';
   reason: string;
   attachment_url?: string;
+  is_full_day: boolean;
+  schedules?: ScheduleWithDetails[];
   status: RequestStatus;
-  reviewed_by?: string;
+  reviewed_by?: number;
   reviewed_at?: string;
   created_at: string;
+  updated_at?: string;
   student?: Profile;
   reviewer?: Profile;
 }
 
 export interface Notification {
-  id: string;
-  user_id: string;
+  id: number;
+  user_id: number;
   title: string;
   message: string;
   is_read: boolean;

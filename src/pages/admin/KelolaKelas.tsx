@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { apiClient } from '@/lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,17 +36,17 @@ export default function KelolaKelas() {
   const { data: classes, isLoading } = useQuery({
     queryKey: ['classes'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('classes').select('*').order('name');
-      if (error) throw error;
-      return data as Class[];
+      const data = await apiClient.get<any[]>('/admin/classes');
+      return data.map(c => ({
+        ...c,
+        id: c.id || c.ID
+      })) as Class[];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async ({ name, grade }: { name: string; grade: string }) => {
-      const { data, error } = await supabase.from('classes').insert({ name, grade }).select().single();
-      if (error) throw error;
-      return data;
+      return apiClient.post<any>('/admin/classes', { name, grade });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -60,9 +60,7 @@ export default function KelolaKelas() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, name, grade }: { id: string; name: string; grade: string }) => {
-      const { data, error } = await supabase.from('classes').update({ name, grade }).eq('id', id).select().single();
-      if (error) throw error;
-      return data;
+      return apiClient.put<any>(`/admin/classes/${id}`, { name, grade });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -76,8 +74,7 @@ export default function KelolaKelas() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('classes').delete().eq('id', id);
-      if (error) throw error;
+      return apiClient.delete(`/admin/classes/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -102,7 +99,7 @@ export default function KelolaKelas() {
     }
 
     if (editingClass) {
-      updateMutation.mutate({ id: editingClass.id, name, grade });
+      updateMutation.mutate({ id: editingClass.id.toString(), name, grade });
     } else {
       createMutation.mutate({ name, grade });
     }
@@ -110,8 +107,8 @@ export default function KelolaKelas() {
 
   const handleEdit = (cls: Class) => {
     setEditingClass(cls);
-    setName(cls.name);
-    setGrade(cls.grade);
+    setName(cls.name || '');
+    setGrade(cls.grade || '');
     setOpen(true);
   };
 
@@ -199,7 +196,7 @@ export default function KelolaKelas() {
               </TableHeader>
               <TableBody>
                 {classes.map((cls, idx) => (
-                  <TableRow key={cls.id}>
+                  <TableRow key={cls.id || `class-${idx}`}>
                     <TableCell>{idx + 1}</TableCell>
                     <TableCell className="font-medium">{cls.name}</TableCell>
                     <TableCell>{cls.grade}</TableCell>
@@ -212,7 +209,7 @@ export default function KelolaKelas() {
                           variant="ghost"
                           size="icon"
                           className="text-destructive"
-                          onClick={() => deleteMutation.mutate(cls.id)}
+                          onClick={() => deleteMutation.mutate(cls.id?.toString() || "")}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

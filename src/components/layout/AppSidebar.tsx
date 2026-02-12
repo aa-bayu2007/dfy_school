@@ -47,6 +47,7 @@ const menuItems = {
   ],
   guru: [
     { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+    { title: 'Scan Absensi', url: '/dashboard/scan', icon: ScanLine },
     { title: 'Jadwal Mengajar', url: '/dashboard/jadwal', icon: Calendar },
     { title: 'Rekap Absensi', url: '/dashboard/rekap', icon: ClipboardList },
     { title: 'Permintaan Izin', url: '/dashboard/review-izin', icon: FileText },
@@ -70,7 +71,15 @@ export default function AppSidebar() {
   // Get menu based on highest role
   const getMenuItems = () => {
     if (roles.includes('admin')) return menuItems.admin;
-    if (roles.includes('guru')) return menuItems.guru;
+    if (roles.includes('guru')) {
+      const items = [...menuItems.guru];
+      // Wali Kelas check: if guru has a class_id
+      if (profile?.class_id) {
+        // Find position to insert after 'Dashboard' or just push
+        items.splice(1, 0, { title: 'Daftar Siswa', url: '/dashboard/absensi-kelas', icon: Users });
+      }
+      return items;
+    }
     if (roles.includes('ketua_kelas')) return menuItems.ketua_kelas;
     return menuItems.murid;
   };

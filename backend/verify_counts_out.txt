@@ -1,0 +1,6 @@
+﻿Database connected!
+--- Final Verification ---
+Ahmad Ketua (ID 3) attendance records: 3 (Schedules today: 3)
+Siti Aminah (ID 4) attendance records: 3 (Schedules today: 3)
+Ahmad scanned by: 2
+Siti scanned by: 3

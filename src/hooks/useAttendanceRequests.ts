@@ -1,31 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { AttendanceRequest, RequestStatus } from '@/types/database';
 import { toast } from 'sonner';
+import { apiClient } from '@/lib/api-client';
 
-export function useAttendanceRequests(studentId?: string, status?: RequestStatus) {
+export function useAttendanceRequests(studentId?: string, status?: RequestStatus, classId?: string | number) {
   return useQuery({
-    queryKey: ['attendance-requests', studentId, status],
+    queryKey: ['attendance-requests', studentId, status, classId],
     queryFn: async () => {
-      let query = supabase
-        .from('attendance_requests')
-        .select(`
-          *,
-          student:profiles(*),
-          reviewer:profiles(*)
-        `)
-        .order('created_at', { ascending: false });
+      const params = new URLSearchParams();
+      if (studentId) params.append('student_id', studentId);
+      if (status) params.append('status', status);
+      if (classId) params.append('class_id', classId.toString());
 
-      if (studentId) {
-        query = query.eq('student_id', studentId);
-      }
-      if (status) {
-        query = query.eq('status', status);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as unknown as AttendanceRequest[];
+      const data = await apiClient.get<any[]>(`/attendance/requests?${params.toString()}`);
+      return data.map(req => ({
+        ...req,
+        id: req.id || req.ID,
+        student: req.student ? {
+          ...req.student,
+          id: req.student.id || req.student.ID,
+          // Backend User model has 'name' field directly
+          full_name: req.student.name || req.student.full_name || req.student.profile?.full_name,
+          nis: req.student.profile?.nis,
+          // Class can be direct relation or through profile
+          class: req.student.class || req.student.Class || req.student.profile?.class
+        } : null,
+        reviewer: req.reviewer ? {
+          ...req.reviewer,
+          id: req.reviewer.id || req.reviewer.ID,
+          full_name: req.reviewer.name || req.reviewer.full_name || req.reviewer.profile?.full_name
+        } : null,
+        // Ensure schedules array exists
+        schedules: req.schedules || []
+      })) as AttendanceRequest[];
     },
   });
 }
@@ -40,27 +47,26 @@ export function useCreateAttendanceRequest() {
       requestType,
       reason,
       attachmentUrl,
+      isFullDay = true,
+      scheduleIds = [],
     }: {
       studentId: string;
       date: string;
       requestType: 'sakit' | 'izin';
       reason: string;
       attachmentUrl?: string;
+      isFullDay?: boolean;
+      scheduleIds?: number[];
     }) => {
-      const { data, error } = await supabase
-        .from('attendance_requests')
-        .insert({
-          student_id: studentId,
-          date,
-          request_type: requestType,
-          reason,
-          attachment_url: attachmentUrl,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      return apiClient.post<any>('/attendance/request', {
+        student_id: Number(studentId),
+        date,
+        request_type: requestType,
+        reason,
+        attachment_url: attachmentUrl || "",
+        is_full_day: isFullDay,
+        schedule_ids: scheduleIds
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance-requests'] });
@@ -85,33 +91,10 @@ export function useReviewAttendanceRequest() {
       status: 'approved' | 'rejected';
       reviewerId: string;
     }) => {
-      const { data, error } = await supabase
-        .from('attendance_requests')
-        .update({
-          status,
-          reviewed_by: reviewerId,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', requestId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // If approved, update the attendance record
-      if (status === 'approved') {
-        const request = data as unknown as AttendanceRequest;
-        await supabase
-          .from('attendances')
-          .upsert({
-            student_id: request.student_id,
-            date: request.date,
-            status: request.request_type,
-            notes: request.reason,
-          });
-      }
-
-      return data;
+      return apiClient.post<any>(`/attendance/requests/${requestId}/approve`, {
+        status,
+        reviewer_id: Number(reviewerId)
+      });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['attendance-requests'] });
