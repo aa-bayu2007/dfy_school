@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,10 +62,16 @@ interface BackendUser {
 export default function KelolaUsers() {
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<BackendUser | null>(null);
+  const [activeTab, setActiveTab] = useState('student');
   const [selectedRole, setSelectedRole] = useState<AppRole>('murid');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [showPromoteDialog, setShowPromoteDialog] = useState(false);
+  const [selectedPromoStudent, setSelectedPromoStudent] = useState<string>('');
+  const [dialogSearchName, setDialogSearchName] = useState('');
+  const [dialogSearchGrade, setDialogSearchGrade] = useState<string>('all');
+  const [dialogSearchMajor, setDialogSearchMajor] = useState<string>('all');
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
@@ -126,26 +133,16 @@ export default function KelolaUsers() {
   };
 
   const downloadTemplate = () => {
-    // Basic CSV template that Excel can open
     const headers = ["Nama", "Email", "NIS", "Kelas (Nama)", "Password (Opsional)"];
     const rows = [
       ["Ahmad Fauzi", "ahmad@student.com", "12345", "X PPLG 1", "123456"],
       ["Siti Aminah", "siti@student.com", "12346", "XI DKV 2", "123456"]
     ];
 
-    const csvContent = [headers, ...rows]
-      .map(e => e.join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", "template_import_siswa.csv");
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template Siswa");
+    XLSX.writeFile(workbook, "template_import_siswa.xlsx");
   };
 
   const updateRoleMutation = useMutation({
@@ -250,6 +247,34 @@ export default function KelolaUsers() {
     await createUserMutation.mutateAsync(newUser);
   };
 
+  const studentsForManagement = useMemo(() => {
+    return profiles?.filter(p => {
+      // Show only murid and ketua_kelas in this management dialog
+      const isRoleMatch = p.role === 'murid' || p.role === 'ketua_kelas' || p.role === 'student';
+      if (!isRoleMatch) return false;
+
+      // Filter by Dialog Search States
+      if (dialogSearchName && !p.name.toLowerCase().includes(dialogSearchName.toLowerCase())) return false;
+      if (dialogSearchGrade !== 'all' && p.class?.grade !== dialogSearchGrade) return false;
+      if (dialogSearchMajor !== 'all' && p.class?.major !== dialogSearchMajor) return false;
+
+      return true;
+    }) || [];
+  }, [profiles, dialogSearchName, dialogSearchGrade, dialogSearchMajor]);
+
+  const handlePromote = async () => {
+    if (!selectedPromoStudent) {
+      toast.error('Pilih siswa terlebih dahulu');
+      return;
+    }
+    await updateRoleMutation.mutateAsync({
+      userId: parseInt(selectedPromoStudent),
+      role: 'ketua_kelas'
+    });
+    setShowPromoteDialog(false);
+    setSelectedPromoStudent('');
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -264,39 +289,51 @@ export default function KelolaUsers() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => downloadTemplate()} variant="outline" className="rounded-xl border-dashed">
-              <Download className="h-4 w-4 mr-2" />
-              Template Excel
-            </Button>
-            <div className="relative">
-              <input
-                type="file"
-                id="excel-upload"
-                className="hidden"
-                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImportExcel(file);
-                }}
-              />
-              <Button onClick={() => document.getElementById('excel-upload')?.click()} variant="outline" className="rounded-xl gradient-primary text-white border-none shadow-lg shadow-primary/20 hover:opacity-90">
-                <FileUp className="h-4 w-4 mr-2" />
-                Import Excel
+            {activeTab === 'student' && (
+              <>
+                <Button onClick={() => downloadTemplate()} variant="outline" className="rounded-xl border-dashed">
+                  <Download className="h-4 w-4 mr-2" />
+                  Template Excel
+                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="excel-upload"
+                    className="hidden"
+                    accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImportExcel(file);
+                    }}
+                  />
+                  <Button onClick={() => document.getElementById('excel-upload')?.click()} variant="outline" className="rounded-xl gradient-primary text-white border-none shadow-lg shadow-primary/20 hover:opacity-90">
+                    <FileUp className="h-4 w-4 mr-2" />
+                    Import Excel
+                  </Button>
+                </div>
+              </>
+            )}
+            {activeTab === 'ketua_kelas' ? (
+              <Button onClick={() => setShowPromoteDialog(true)} className="rounded-xl gradient-primary border-none shadow-lg shadow-primary/20 hover:opacity-90">
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Ketua Kelas
               </Button>
-            </div>
-            <Button onClick={() => setAddUserDialogOpen(true)} className="rounded-xl gradient-primary border-none shadow-lg shadow-primary/20 hover:opacity-90">
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Pengguna
-            </Button>
+            ) : (
+              <Button onClick={() => setAddUserDialogOpen(true)} className="rounded-xl gradient-primary border-none shadow-lg shadow-primary/20 hover:opacity-90">
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Pengguna
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
       <div className="space-y-4">
         <Tabs
-          defaultValue="student"
+          value={activeTab}
           className="w-full"
-          onValueChange={() => {
+          onValueChange={(value) => {
+            setActiveTab(value);
             setSelectedGrade(null);
             setSelectedMajor(null);
             setSelectedSection(null);
@@ -799,6 +836,146 @@ export default function KelolaUsers() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               Buat Pengguna
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-primary" />
+              Kelola Ketua Kelas
+            </DialogTitle>
+            <DialogDescription>
+              Cari siswa dan atur status Ketua Kelas mereka.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4 min-h-0 flex-1 flex flex-col">
+            {/* Search Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1">Nama</label>
+                <input
+                  type="text"
+                  placeholder="Cari nama..."
+                  className="flex h-9 w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                  value={dialogSearchName}
+                  onChange={(e) => setDialogSearchName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1">Tingkat</label>
+                <Select value={dialogSearchGrade} onValueChange={setDialogSearchGrade}>
+                  <SelectTrigger className="h-9 rounded-lg">
+                    <SelectValue placeholder="Semua Tingkat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Tingkat</SelectItem>
+                    <SelectItem value="X">Kelas X</SelectItem>
+                    <SelectItem value="XI">Kelas XI</SelectItem>
+                    <SelectItem value="XII">Kelas XII</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1">Jurusan</label>
+                <Select value={dialogSearchMajor} onValueChange={setDialogSearchMajor}>
+                  <SelectTrigger className="h-9 rounded-lg">
+                    <SelectValue placeholder="Semua Jurusan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Jurusan</SelectItem>
+                    <SelectItem value="PPLG">PPLG</SelectItem>
+                    <SelectItem value="TBSM">TBSM</SelectItem>
+                    <SelectItem value="DKV">DKV</SelectItem>
+                    <SelectItem value="TJKT">TJKT</SelectItem>
+                    <SelectItem value="TOI">TOI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Results Table */}
+            <div className="flex-1 min-h-0 border rounded-xl overflow-hidden bg-muted/10">
+              <ScrollArea className="h-[400px]">
+                <Table>
+                  <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead className="text-xs font-bold">Nama</TableHead>
+                      <TableHead className="text-xs font-bold">NIS</TableHead>
+                      <TableHead className="text-xs font-bold">Kelas</TableHead>
+                      <TableHead className="text-xs font-bold text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {studentsForManagement.length > 0 ? (
+                      studentsForManagement.map((s) => (
+                        <TableRow key={s.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="font-medium py-3 text-sm">
+                            <div className="flex flex-col">
+                              <span>{s.name}</span>
+                              {s.role === 'ketua_kelas' && (
+                                <Badge variant="outline" className="w-fit text-[10px] h-4 px-1 mt-0.5 border-warning/50 text-warning">
+                                  Ketua Kelas
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs">{s.nis || '-'}</TableCell>
+                          <TableCell className="text-xs">{s.class?.name || '-'}</TableCell>
+                          <TableCell className="text-right">
+                            {s.role === 'ketua_kelas' ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 text-[11px]"
+                                onClick={() => updateRoleMutation.mutate({ userId: s.id, role: 'murid' })}
+                                disabled={updateRoleMutation.isPending}
+                              >
+                                {updateRoleMutation.isPending && s.id === selectedUser?.id ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <RotateCcw className="h-3 w-3 mr-1" />
+                                )}
+                                Hapus
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-primary hover:text-primary hover:bg-primary/10 text-[11px]"
+                                onClick={() => updateRoleMutation.mutate({ userId: s.id, role: 'ketua_kelas' })}
+                                disabled={updateRoleMutation.isPending}
+                              >
+                                {updateRoleMutation.isPending && s.id === selectedUser?.id ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <Plus className="h-3 w-3 mr-1" />
+                                )}
+                                Tambah
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground text-sm">
+                          Tidak ada siswa ditemukan
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPromoteDialog(false)}>
+              Selesai
             </Button>
           </DialogFooter>
         </DialogContent>

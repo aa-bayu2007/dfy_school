@@ -31,6 +31,9 @@ func main() {
 		&models.Attendance{},
 		&models.AttendanceRequest{},
 		&models.DailyQRCode{},
+		&models.VotingSession{},
+		&models.VotingCandidate{},
+		&models.Vote{},
 	)
 
 	// Repositories
@@ -38,12 +41,16 @@ func main() {
 	masterRepo := repositories.NewMasterRepository(db)
 	attendRepo := repositories.NewAttendanceRepository(db)
 	requestRepo := repositories.NewRequestRepository(db)
+	votingRepo := repositories.NewVotingRepository(db)
+	notifRepo := repositories.NewNotificationRepository(db)
 
 	// Services
 	authService := services.NewAuthService(userRepo)
 	masterService := services.NewMasterService(masterRepo)
 	attendService := services.NewAttendanceService(attendRepo, userRepo, masterRepo)
 	reqService := services.NewRequestService(requestRepo, attendRepo, userRepo, masterRepo)
+	notifService := services.NewNotificationService(notifRepo)
+	votingService := services.NewVotingService(votingRepo, userRepo, notifService)
 
 	// Handlers
 	authHandler := controllers.NewAuthHandler(authService)
@@ -51,7 +58,8 @@ func main() {
 	attendHandler := controllers.NewAttendanceHandler(attendService)
 	reqHandler := controllers.NewRequestHandler(reqService)
 	studentHandler := controllers.NewStudentHandler(attendService, authService)
-	notifHandler := controllers.NewNotificationHandler()
+	notifHandler := controllers.NewNotificationHandler(notifService)
+	votingHandler := controllers.NewVotingHandler(votingService, authService)
 
 	r := gin.Default()
 
@@ -67,7 +75,7 @@ func main() {
 		c.Next()
 	})
 
-	routes.SetupRoutes(r, authHandler, adminHandler, attendHandler, reqHandler, studentHandler, notifHandler)
+	routes.SetupRoutes(r, authHandler, adminHandler, attendHandler, reqHandler, studentHandler, notifHandler, votingHandler, masterService, authService)
 
 	log.Println("Server starting on port 8081")
 	r.Run(":8081")
