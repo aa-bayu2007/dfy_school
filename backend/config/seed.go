@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"log"
+	"strings"
+
+	"github.com/xuri/excelize/v2"
 )
+
 
 func hashPassword(password string) string {
 	bytes, _ := bcrypt.GenerateFromPassword([]byte(password), 14)
@@ -124,6 +128,62 @@ func SeedData() {
 	db.Where("name = ?", "XII PPLG 1").First(&classXII1)
 	db.Where("name = ?", "XII PPLG 2").First(&classXII2)
 
+	f, err := excelize.OpenFile("data/siswa.xlsx")
+	if err != nil {
+		log.Fatalf("Gagal buka file excel: %v", err)
+	}
+
+	sheetName := f.GetSheetName(0)
+
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		log.Fatalf("Gagal baca sheet: %v", err)
+	}
+
+	for i, row := range rows {
+
+		// Skip header
+		if i == 0 {
+			continue
+		}
+
+		if len(row) < 3 {
+			continue
+		}
+
+		nis := strings.TrimSpace(row[1])
+		nama := strings.TrimSpace(row[2])
+
+		if nis == "" || nama == "" {
+			continue
+		}
+
+		email := nis + "@student.com"
+
+		var user models.User
+		err := db.Where("email = ?", email).First(&user).Error
+
+		if err != nil {
+			user = models.User{
+				Name:     nama,
+				Email:    email,
+				Password: hashPassword(nis), // 🔥 Password = NIS
+				Role:     "murid",
+				ClassID:  &classXII1.ID,
+			}
+			db.Create(&user)
+		}
+
+		var profile models.Profile
+		if err := db.Where("user_id = ?", user.ID).First(&profile).Error; err != nil {
+			profile = models.Profile{
+				UserID: user.ID,
+				NIS:    nis,
+			}
+			db.Create(&profile)
+		}
+	}
+
 	// Seed Students for X PPLG 1
 	studentsX1 := []models.User{
 		{Name: "Bagus X", Email: "bagus@student.com", Password: hashPassword("password"), Role: "murid", ClassID: &classX1.ID},
@@ -211,4 +271,5 @@ func SeedData() {
 	log.Println("  Ketua Kelas PPLG 1: ahmad@student.com / password")
 	log.Println("  Ketua Kelas PPLG 2: dina@student.com / password")
 	log.Println("  Murid: siti@student.com / password (and others)")
+	log.Println("Seed Excel siswa XII PPLG 1 selesai")
 }

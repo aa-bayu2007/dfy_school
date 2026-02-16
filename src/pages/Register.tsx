@@ -21,27 +21,19 @@ export default function Register() {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      toast.error('Password tidak sama!');
-      return;
-    }
-
-    if (password.length < 6) {
-      toast.error('Password minimal 6 karakter!');
+      toast.error('Password tidak sama');
       return;
     }
 
     setLoading(true);
 
     try {
-      await signUp(email, password, fullName);
-      toast.success('Pendaftaran berhasil! Silakan cek email untuk verifikasi.');
-      navigate('/login');
-    } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error('Gagal mendaftar. Coba lagi.');
+      if (signUp) {
+        await signUp(email, password, fullName);
+        navigate('/login');
       }
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal registrasi. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
