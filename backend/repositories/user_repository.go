@@ -61,7 +61,7 @@ func (r *userRepository) FindUsersByRole(roleName string) ([]models.User, error)
 
 func (r *userRepository) GetStudentsByClass(classID uint) ([]models.User, error) {
 	var users []models.User
-	err := r.db.Where("role = ? AND class_id = ?", "murid", classID).
+	err := r.db.Where("role IN (?, ?) AND class_id = ?", "murid", "ketua_kelas", classID).
 		Preload("Class").Preload("Profile").
 		Find(&users).Error
 	return users, err

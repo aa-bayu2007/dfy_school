@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"backend/repositories"
 	"errors"
+	"log"
 	"time"
 )
 
@@ -229,10 +230,14 @@ func (s *votingService) DemoteKetuaKelas(classID uint, teacherID uint) error {
 		return errors.New("tidak ada Ketua Kelas yang ditemukan di kelas ini")
 	}
 
+	log.Printf("[DemoteKM] Found student to demote: %s (ID: %d)", km.Name, km.ID)
 	km.Role = "murid"
+	km.TenureEndsAt = nil
 	if err := s.userRepo.GetDB().Save(&km).Error; err != nil {
+		log.Printf("[DemoteKM] Save Error: %v", err)
 		return err
 	}
+	log.Printf("[DemoteKM] Successfully demoted student %d to 'murid'", km.ID)
 
 	// Notify them
 	s.notifService.NotifyUser(km.ID, "Jabatan Dicabut", "Jabatan Ketua Kelas Anda telah dicabut oleh Wali Kelas.")

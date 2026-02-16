@@ -112,7 +112,7 @@ export default function VoteKM() {
     // 2. Fetch Students in Class (for Guru/Wali Kelas)
     const { data: students } = useQuery({
         queryKey: ['class-students', classId],
-        queryFn: () => apiClient.get<any[]>('/voting/students'),
+        queryFn: () => apiClient.get<any[]>(`/voting/students?class_id=${classId}`),
         enabled: isGuru && !!classId,
     });
 
@@ -160,6 +160,7 @@ export default function VoteKM() {
         mutationFn: () => apiClient.post('/voting/demote', { class_id: classId }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['active-voting-session'] });
+            queryClient.invalidateQueries({ queryKey: ['class-students'] });
             toast.success('Jabatan Ketua Kelas berhasil dicabut.');
         },
         onError: (err: any) => toast.error(err.message)

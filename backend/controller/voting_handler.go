@@ -3,6 +3,7 @@ package controllers
 import (
 	"backend/pkg/response"
 	"backend/services"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -141,7 +142,9 @@ func (h *VotingHandler) DemoteKetuaKelas(c *gin.Context) {
 		teacherID = v
 	}
 
+	log.Printf("[DemoteKM] ClassID: %d, TeacherID: %d", req.ClassID, teacherID)
 	if err := h.votingService.DemoteKetuaKelas(req.ClassID, teacherID); err != nil {
+		log.Printf("[DemoteKM] Error: %v", err)
 		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}

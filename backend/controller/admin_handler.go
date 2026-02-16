@@ -474,22 +474,52 @@ func (h *AdminHandler) ImportStudents(c *gin.Context) {
 	// Skip header (row 0)
 	for i := 1; i < len(rows); i++ {
 		row := rows[i]
-		if len(row) < 4 {
-			continue // Skip incomplete rows
+		if len(row) < 3 {
+			continue // Skip empty or too short rows
 		}
 
-		name := row[0]
-		email := row[1]
-		nis := row[2]
-		className := strings.ToUpper(row[3])
-		password := "123456" // Default password if not provided
-		if len(row) >= 5 && row[4] != "" {
-			password = row[4]
+		name := strings.TrimSpace(row[0])
+		email := ""
+		if len(row) > 1 {
+			email = strings.TrimSpace(row[1])
+		}
+		nis := ""
+		if len(row) > 2 {
+			nis = strings.TrimSpace(row[2])
+			// Remove trailing .0 from NIS if it's imported as a float string from Excel
+			nis = strings.TrimSuffix(nis, ".0")
 		}
 
-		classID, ok := classMap[className]
-		if !ok {
-			c.JSON(http.StatusBadRequest, response.Error("Class not found: "+className+" at row "+strconv.Itoa(i+1)))
+		// Skip if name or NIS is missing
+		if name == "" || nis == "" {
+			continue
+		}
+
+		// Use row[3] for className if available
+		className := ""
+		if len(row) > 3 {
+			className = strings.ToUpper(strings.TrimSpace(row[3]))
+		}
+
+		// Auto-generate email if missing
+		if email == "" {
+			email = nis + "@student.com"
+		}
+
+		password := "123456" // Default password
+		// Check for password in row[4] if available
+		if len(row) > 4 && strings.TrimSpace(row[4]) != "" {
+			password = strings.TrimSpace(row[4])
+		}
+
+		classID, ok := uint(0), false
+		if className != "" {
+			classID, ok = classMap[className]
+		}
+
+		// If class name is empty or not found, maybe assign a default or return error
+		if !ok && className != "" {
+			c.JSON(http.StatusBadRequest, response.Error("Kelas '"+className+"' tidak ditemukan di baris "+strconv.Itoa(i+1)))
 			return
 		}
 

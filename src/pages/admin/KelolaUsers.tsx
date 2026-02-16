@@ -365,7 +365,9 @@ export default function KelolaUsers() {
             // Filter Logic
             const filteredUsers = profiles?.filter(p => {
               // 1. Role Filter
-              const isRoleMatch = p.role === role || (role === 'student' && p.role === 'murid');
+              const isRoleMatch = role === 'student'
+                ? (p.role === 'murid' || p.role === 'ketua_kelas' || p.role === 'student')
+                : (p.role === role);
               if (!isRoleMatch) return false;
 
               // 2. Grade, Major, & Section Filter (For students and class leaders)
@@ -591,6 +593,11 @@ export default function KelolaUsers() {
                                       {profile.name.charAt(0)}
                                     </div>
                                     {profile.name}
+                                    {profile.role === 'ketua_kelas' && role === 'student' && (
+                                      <Badge variant="outline" className="h-5 text-[10px] px-1.5 border-warning/30 bg-warning/5 text-warning-foreground ml-2">
+                                        Ketua Kelas
+                                      </Badge>
+                                    )}
                                   </div>
                                 </TableCell>
                                 <TableCell>{profile.nis || profile.nip || '-'}</TableCell>

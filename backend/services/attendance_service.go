@@ -178,6 +178,7 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 
 		attendance := models.Attendance{
 			StudentID:  uint(studentID),
+			ClassID:    *student.ClassID,
 			ScheduleID: &schedule.ID,
 			Date:       now,
 			Status:     models.StatusHadir,
@@ -202,6 +203,7 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 				// Not present yet, mark them as present
 				s.attendRepo.Create(&models.Attendance{
 					StudentID:  scanner.ID,
+					ClassID:    *scanner.ClassID,
 					ScheduleID: &sch.ID,
 					Date:       now,
 					Status:     models.StatusHadir,
@@ -246,49 +248,56 @@ func (s *attendanceService) GetStats(classID string, startDate string, endDate s
 }
 
 func (s *attendanceService) GetRecap(classID string, startDate string, endDate string) ([]map[string]interface{}, error) {
-	// 1. Get Aggregated Stats
+	// 1. Get All Students in Class
+	cID, _ := strconv.ParseUint(classID, 10, 32)
+	students, err := s.userRepo.GetStudentsByClass(uint(cID))
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Get Aggregated Stats
 	stats, err := s.attendRepo.GetMonthlyRecap(classID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. Enrich with Student Data
-	// Optimally, we could join in the SQL query, but fetching users is cleaner for ORM usage if not too heavy.
-	// Or we can just join in Repo. But let's stick to Repo returning maps, and we fetch users here if needed.
-	// Actually, fetching all users in class and mapping them is better to show "0 attendance" students too?
-	// For now, let's just show students who have at least ONE record (stats).
-	// But Recap usually needs ALL students.
-
-	// Get All Students in Class
-	// We need a method in UserRepository or MasterRepository for this.
-	// Assuming s.userRepo or similar can do it.
-	// s.masterRepo has FindClassByID.
-	// Use UserRepository.FindAllByClassID (need to check if exists) or just loop stats and fetch student.
-	// Fetching individually is N+1.
-
-	// Better: GetMonthlyRecap JOINed users already, so we have User data if we selected it.
-	// But I only selected `student_id`.
-	// Let's assume we want to enrich here.
+	// 3. Merge Stats with All Students
+	statsMap := make(map[uint]map[string]interface{})
+	for _, stat := range stats {
+		statsMap[stat["student_id"].(uint)] = stat
+	}
 
 	var enrichedResults []map[string]interface{}
+	for _, student := range students {
+		stat, ok := statsMap[student.ID]
 
-	for _, stat := range stats {
-		studentID := stat["student_id"].(uint)
-		user, err := s.userRepo.FindByID(studentID)
-		if err == nil {
-			nis := ""
-			if user.Profile != nil {
-				nis = user.Profile.NIS
-			}
+		nis := ""
+		if student.Profile != nil {
+			nis = student.Profile.NIS
+		}
 
-			stat["student"] = map[string]interface{}{
-				"id":        user.ID,
-				"name":      user.Name,
-				"full_name": user.Name,
-				"nis":       nis,
-				"class":     user.Class,
-			}
+		studentData := map[string]interface{}{
+			"id":        student.ID,
+			"name":      student.Name,
+			"full_name": student.Name,
+			"nis":       nis,
+			"class":     student.Class,
+		}
+
+		if ok {
+			stat["student"] = studentData
 			enrichedResults = append(enrichedResults, stat)
+		} else {
+			// Student has no attendance records in this period
+			enrichedResults = append(enrichedResults, map[string]interface{}{
+				"student_id": student.ID,
+				"hadir":      0,
+				"sakit":      0,
+				"izin":       0,
+				"alpha":      0,
+				"total":      0,
+				"student":    studentData,
+			})
 		}
 	}
 
