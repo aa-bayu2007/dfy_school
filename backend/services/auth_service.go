@@ -5,6 +5,8 @@ import (
 	"backend/pkg/utils"
 	"backend/repositories"
 	"errors"
+	"log"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -42,27 +44,38 @@ func (s *authService) Login(identifier, password string) (string, string, *model
 	var user models.User
 	var err error
 
+	// Trim whitespace to prevent formatting issues
+	identifier = strings.TrimSpace(identifier)
+
+	log.Printf("[Login] Attempt for identifier: %s", identifier)
+
 	// Try finding by Email first
 	err = s.userRepo.GetDB().Preload("Class").Preload("Profile").Where("email = ?", identifier).First(&user).Error
 
 	// If not found by email, try finding by NIS or NIP in Profile
 	if err != nil {
 		// Join User with Profile to search by NIS or NIP
+		// Explicitly select "users.*" to avoid ID ambiguity with profiles table
 		err = s.userRepo.GetDB().
 			Preload("Class").
 			Preload("Profile").
 			Joins("JOIN profiles ON profiles.user_id = users.id").
 			Where("profiles.nis = ? OR profiles.nip = ?", identifier, identifier).
+			Select("users.*").
 			First(&user).Error
 	}
 
 	if err != nil {
+		log.Printf("[Login] User not found for identifier: %s", identifier)
 		return "", "", nil, errors.New("invalid credentials")
 	}
 
 	if !utils.CheckPasswordHash(password, user.Password) {
+		log.Printf("[Login] Password mismatch for identifier: %s", identifier)
 		return "", "", nil, errors.New("invalid credentials")
 	}
+
+	log.Printf("[Login] Success for user: %s (ID: %d, Role: %s)", user.Email, user.ID, user.Role)
 
 	// Use direct role field
 	roleName := user.Role
