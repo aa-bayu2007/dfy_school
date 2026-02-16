@@ -28,6 +28,23 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Class } from '@/types/database';
 
+interface AttendanceStat {
+  student: {
+    id: number;
+    name?: string;
+    full_name?: string;
+    nis?: string;
+    class?: {
+      name: string;
+    };
+  };
+  hadir: number;
+  sakit: number;
+  izin: number;
+  alpha: number;
+  total: number;
+}
+
 export default function RekapAbsensi() {
   const { roles, profile, user } = useAuth();
   const [selectedClass, setSelectedClass] = useState<string>('');
@@ -74,7 +91,7 @@ export default function RekapAbsensi() {
     if (!stats || stats.length === 0) return;
 
     const worksheet = XLSX.utils.json_to_sheet(
-      stats.map((s: any, idx: number) => ({
+      stats.map((s: AttendanceStat, idx: number) => ({
         No: idx + 1,
         Nama: s.student?.name || s.student?.full_name || '-',
         NIS: s.student?.nis || '-',
@@ -106,7 +123,7 @@ export default function RekapAbsensi() {
     autoTable(doc, {
       startY: 40,
       head: [['No', 'Nama', 'NIS', 'Hadir', 'Sakit', 'Izin', 'Alpha', '%']],
-      body: stats.map((s: any, idx: number) => [
+      body: stats.map((s: AttendanceStat, idx: number) => [
         idx + 1,
         s.student?.name || s.student?.full_name || '-',
         s.student?.nis || '-',
@@ -243,7 +260,7 @@ export default function RekapAbsensi() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stats.map((s: any, idx: number) => (
+                  {stats.map((s: AttendanceStat, idx: number) => (
                     <TableRow key={s.student?.id || idx}>
                       <TableCell>{idx + 1}</TableCell>
                       <TableCell className={`font-medium ${(s.hadir / s.total) === 1 ? 'text-success font-bold' : ''}`}>

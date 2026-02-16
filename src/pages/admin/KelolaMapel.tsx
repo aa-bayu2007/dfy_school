@@ -74,7 +74,7 @@ export default function KelolaMapel() {
 
   const createMutation = useMutation({
     mutationFn: async ({ name, code, teacherId }: { name: string; code?: string; teacherId?: number }) => {
-      return apiClient.post<any>('/admin/subjects', { name, code, teacher_id: teacherId });
+      return apiClient.post<Subject>('/admin/subjects', { name, code, teacher_id: teacherId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
@@ -88,7 +88,7 @@ export default function KelolaMapel() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, name, code, teacherId }: { id: string; name: string; code?: string; teacherId?: number }) => {
-      return apiClient.put<any>(`/admin/subjects/${id}`, { name, code, teacher_id: teacherId });
+      return apiClient.put<Subject>(`/admin/subjects/${id}`, { name, code, teacher_id: teacherId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });

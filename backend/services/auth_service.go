@@ -10,7 +10,7 @@ import (
 )
 
 type AuthService interface {
-	Login(email, password string) (string, string, *models.User, error)
+	Login(identifier, password string) (string, string, *models.User, error)
 	Register(user *models.User) error
 	GetMe(userID uint) (*models.User, error)
 	RefreshToken(tokenStr string) (string, string, error)
@@ -18,6 +18,16 @@ type AuthService interface {
 	GetTeachers() ([]models.User, error)
 	UpdateUserRole(userID uint, roleName string) error
 	UpdateUserClass(userID uint, classID *uint) error
+	CreateUser(user *models.User, profile *models.Profile) error
+	ImportStudents(students []StudentImportData) error
+}
+
+type StudentImportData struct {
+	Name     string
+	Email    string
+	NIS      string
+	ClassID  uint
+	Password string
 }
 
 type authService struct {
@@ -28,9 +38,25 @@ func NewAuthService(userRepo repositories.UserRepository) AuthService {
 	return &authService{userRepo}
 }
 
-func (s *authService) Login(email, password string) (string, string, *models.User, error) {
+func (s *authService) Login(identifier, password string) (string, string, *models.User, error) {
 	var user models.User
-	if err := s.userRepo.GetDB().Preload("Class").Preload("Profile").Where("email = ?", email).First(&user).Error; err != nil {
+	var err error
+
+	// Try finding by Email first
+	err = s.userRepo.GetDB().Preload("Class").Preload("Profile").Where("email = ?", identifier).First(&user).Error
+
+	// If not found by email, try finding by NIS or NIP in Profile
+	if err != nil {
+		// Join User with Profile to search by NIS or NIP
+		err = s.userRepo.GetDB().
+			Preload("Class").
+			Preload("Profile").
+			Joins("JOIN profiles ON profiles.user_id = users.id").
+			Where("profiles.nis = ? OR profiles.nip = ?", identifier, identifier).
+			First(&user).Error
+	}
+
+	if err != nil {
 		return "", "", nil, errors.New("invalid credentials")
 	}
 
@@ -128,4 +154,76 @@ func (s *authService) UpdateUserRole(userID uint, roleName string) error {
 
 func (s *authService) UpdateUserClass(userID uint, classID *uint) error {
 	return s.userRepo.GetDB().Model(&models.User{}).Where("id = ?", userID).Update("class_id", classID).Error
+}
+
+func (s *authService) CreateUser(user *models.User, profile *models.Profile) error {
+	existing, _ := s.userRepo.FindByEmail(user.Email)
+	if existing != nil && existing.ID != 0 {
+		return errors.New("email already registered")
+	}
+
+	hashed, err := utils.HashPassword(user.Password)
+	if err != nil {
+		return err
+	}
+	user.Password = hashed
+
+	tx := s.userRepo.GetDB().Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	if err := tx.Create(user).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	profile.UserID = user.ID
+	if err := tx.Create(profile).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
+func (s *authService) ImportStudents(students []StudentImportData) error {
+	tx := s.userRepo.GetDB().Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	for _, data := range students {
+		// Hass password
+		hashed, err := utils.HashPassword(data.Password)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		user := models.User{
+			Name:     data.Name,
+			Email:    data.Email,
+			Password: hashed,
+			Role:     "murid",
+			ClassID:  &data.ClassID,
+		}
+
+		if err := tx.Create(&user).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		profile := models.Profile{
+			UserID: user.ID,
+			NIS:    data.NIS,
+		}
+
+		if err := tx.Create(&profile).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
 }

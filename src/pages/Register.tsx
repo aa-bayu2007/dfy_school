@@ -36,8 +36,12 @@ export default function Register() {
       await signUp(email, password, fullName);
       toast.success('Pendaftaran berhasil! Silakan cek email untuk verifikasi.');
       navigate('/login');
-    } catch (error: any) {
-      toast.error(error.message || 'Gagal mendaftar. Coba lagi.');
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Gagal mendaftar. Coba lagi.');
+      }
     } finally {
       setLoading(false);
     }

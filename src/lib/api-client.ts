@@ -35,13 +35,19 @@ class ApiClient {
         }
 
         // Normalize ID to id recursively
-        const normalize = (obj: any): any => {
-            if (Array.isArray(obj)) return obj.map(normalize);
+        const normalize = (obj: unknown): unknown => {
+            if (Array.isArray(obj)) {
+                return obj.map(normalize);
+            }
             if (obj !== null && typeof obj === 'object') {
-                const newObj: any = {};
-                for (const key in obj) {
-                    if (key === 'ID') newObj.id = normalize(obj[key]);
-                    else newObj[key] = normalize(obj[key]);
+                const newObj: Record<string, unknown> = {};
+                const typedObj = obj as Record<string, unknown>;
+                for (const key in typedObj) {
+                    if (key === 'ID') {
+                        newObj.id = normalize(typedObj[key]);
+                    } else {
+                        newObj[key] = normalize(typedObj[key]);
+                    }
                 }
                 return newObj;
             }
@@ -55,7 +61,7 @@ class ApiClient {
         return this.request<T>(endpoint, { ...options, method: 'GET' });
     }
 
-    post<T>(endpoint: string, body?: any, options?: RequestInit) {
+    post<T>(endpoint: string, body?: unknown, options?: RequestInit) {
         return this.request<T>(endpoint, {
             ...options,
             method: 'POST',
@@ -63,7 +69,7 @@ class ApiClient {
         });
     }
 
-    put<T>(endpoint: string, body?: any, options?: RequestInit) {
+    put<T>(endpoint: string, body?: unknown, options?: RequestInit) {
         return this.request<T>(endpoint, {
             ...options,
             method: 'PUT',

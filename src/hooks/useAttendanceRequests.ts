@@ -12,6 +12,7 @@ export function useAttendanceRequests(studentId?: string, status?: RequestStatus
       if (status) params.append('status', status);
       if (classId) params.append('class_id', classId.toString());
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = await apiClient.get<any[]>(`/attendance/requests?${params.toString()}`);
       return data.map(req => ({
         ...req,
@@ -58,6 +59,7 @@ export function useCreateAttendanceRequest() {
       isFullDay?: boolean;
       scheduleIds?: number[];
     }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return apiClient.post<any>('/attendance/request', {
         student_id: Number(studentId),
         date,
@@ -91,6 +93,7 @@ export function useReviewAttendanceRequest() {
       status: 'approved' | 'rejected';
       reviewerId: string;
     }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return apiClient.post<any>(`/attendance/requests/${requestId}/approve`, {
         status,
         reviewer_id: Number(reviewerId)

@@ -3,6 +3,7 @@ package main
 import (
 	"backend/config"
 	controllers "backend/controller"
+	"backend/models"
 	"backend/repositories"
 	"backend/routes"
 	"backend/services"
@@ -14,6 +15,23 @@ import (
 func main() {
 	config.ConnectDatabase()
 	db := config.GetDB()
+
+	// Auto Migration
+	log.Println("Migrating database schema...")
+	db.AutoMigrate(
+		&models.Role{},
+		&models.Permission{},
+		&models.Day{},
+		&models.TimeSlot{},
+		&models.User{},
+		&models.Class{},
+		&models.Profile{},
+		&models.Subject{},
+		&models.Schedule{},
+		&models.Attendance{},
+		&models.AttendanceRequest{},
+		&models.DailyQRCode{},
+	)
 
 	// Repositories
 	userRepo := repositories.NewUserRepository(db)
@@ -36,7 +54,7 @@ func main() {
 	notifHandler := controllers.NewNotificationHandler()
 
 	r := gin.Default()
-	
+
 	// CORS Middleware
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")

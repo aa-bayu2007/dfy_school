@@ -29,6 +29,8 @@ export interface Class {
   id: number;
   name: string;
   grade: string;
+  major?: string;
+  section?: string;
   created_at: string;
   updated_at: string;
 }

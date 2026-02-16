@@ -158,11 +158,12 @@ export default function ScanAbsensi() {
                 }
               }, 1500);
 
-            } catch (error: any) {
+            } catch (error) {
               // ERROR FEEDBACK
               console.error("Scan Error:", error);
               setScanStatus('error');
-              toast.error(error.message || "Gagal mencatat kehadiran");
+              const message = error instanceof Error ? error.message : "Gagal mencatat kehadiran";
+              toast.error(message);
 
               setScannedStudents((prev) => [
                 {
@@ -198,7 +199,7 @@ export default function ScanAbsensi() {
     return () => {
       mounted = false;
     };
-  }, [scanning, user?.id, selectedCameraId]);
+  }, [scanning, user?.id, selectedCameraId, recordAttendance]);
 
   const startScanning = () => setScanning(true);
   const stopScanning = () => setScanning(false);

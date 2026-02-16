@@ -193,7 +193,7 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 	// Create/Update DailyQRCode as used (optional, keeping it simple for now)
 
 	// Requirement: Jika ketua kelas yang melakukan scan, otomatis hadir juga
-	if scanner != nil && scanner.Role == "ketua_kelas" && scanner.ClassID != nil {
+	if scanner.Role == "ketua_kelas" && scanner.ClassID != nil {
 		// Get schedules for the scanner (ketua kelas) themselves
 		scannerSchedules, _ := s.masterRepo.GetSchedules(fmt.Sprintf("%d", *scanner.ClassID), "", dayID)
 		for _, sch := range scannerSchedules {

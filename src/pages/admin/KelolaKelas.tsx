@@ -15,6 +15,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -30,8 +37,11 @@ export default function KelolaKelas() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
-  const [name, setName] = useState('');
+
+  // New States
   const [grade, setGrade] = useState('');
+  const [major, setMajor] = useState('');
+  const [section, setSection] = useState('');
 
   const { data: classes, isLoading } = useQuery({
     queryKey: ['classes'],
@@ -45,8 +55,8 @@ export default function KelolaKelas() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({ name, grade }: { name: string; grade: string }) => {
-      return apiClient.post<any>('/admin/classes', { name, grade });
+    mutationFn: async ({ grade, major, section }: { grade: string; major: string; section: string }) => {
+      return apiClient.post<Class>('/admin/classes', { grade, major, section });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -59,8 +69,8 @@ export default function KelolaKelas() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, name, grade }: { id: string; name: string; grade: string }) => {
-      return apiClient.put<any>(`/admin/classes/${id}`, { name, grade });
+    mutationFn: async ({ id, grade, major, section }: { id: string; grade: string; major: string; section: string }) => {
+      return apiClient.put<Class>(`/admin/classes/${id}`, { grade, major, section });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -88,27 +98,29 @@ export default function KelolaKelas() {
   const resetForm = () => {
     setOpen(false);
     setEditingClass(null);
-    setName('');
     setGrade('');
+    setMajor('');
+    setSection('');
   };
 
   const handleSubmit = () => {
-    if (!name || !grade) {
+    if (!grade || !major || !section) {
       toast.error('Lengkapi semua field!');
       return;
     }
 
     if (editingClass) {
-      updateMutation.mutate({ id: editingClass.id.toString(), name, grade });
+      updateMutation.mutate({ id: editingClass.id.toString(), grade, major, section });
     } else {
-      createMutation.mutate({ name, grade });
+      createMutation.mutate({ grade, major, section });
     }
   };
 
   const handleEdit = (cls: Class) => {
     setEditingClass(cls);
-    setName(cls.name || '');
     setGrade(cls.grade || '');
+    setMajor(cls.major || '');
+    setSection(cls.section || '');
     setOpen(true);
   };
 
@@ -125,57 +137,99 @@ export default function KelolaKelas() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); else setOpen(v); }}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary">
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Kelas
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingClass ? 'Edit Kelas' : 'Tambah Kelas'}</DialogTitle>
-              <DialogDescription>
-                {editingClass ? 'Edit data kelas' : 'Tambah kelas baru ke sistem'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama Kelas</Label>
-                <Input
-                  id="name"
-                  placeholder="contoh: 10A, 11 IPA 1"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="grade">Tingkat</Label>
-                <Input
-                  id="grade"
-                  placeholder="contoh: X, XI, XII"
-                  value={grade}
-                  onChange={(e) => setGrade(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={resetForm}>
-                Batal
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              apiClient.post('/admin/classes/migrate')
+                .then(() => {
+                  queryClient.invalidateQueries({ queryKey: ['classes'] });
+                  toast.success('Data berhasil disinkronkan!');
+                })
+                .catch((err) => toast.error('Gagal sinkronisasi: ' + err.message));
+            }}
+          >
+            <Loader2 className="h-4 w-4 mr-2" />
+            Sinkronkan Data
+          </Button>
+          <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); else setOpen(v); }}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary">
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Kelas
               </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={createMutation.isPending || updateMutation.isPending}
-                className="gradient-primary"
-              >
-                {(createMutation.isPending || updateMutation.isPending) && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                )}
-                {editingClass ? 'Simpan' : 'Tambah'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingClass ? 'Edit Kelas' : 'Tambah Kelas'}</DialogTitle>
+                <DialogDescription>
+                  {editingClass ? 'Edit data kelas' : 'Tambah kelas baru ke sistem'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {/* Grade Selection */}
+                <div className="space-y-2">
+                  <Label>Tingkat</Label>
+                  <Select value={grade} onValueChange={setGrade}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Tingkat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['X', 'XI', 'XII'].map(g => (
+                        <SelectItem key={g} value={g}>Kelas {g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Major Selection */}
+                <div className="space-y-2">
+                  <Label>Jurusan</Label>
+                  <Select value={major} onValueChange={setMajor}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Jurusan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['PPLG', 'TBSM', 'DKV', 'TJKT', 'TOI'].map(m => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Section Selection */}
+                <div className="space-y-2">
+                  <Label>Kelas</Label>
+                  <Select value={section} onValueChange={setSection}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['1', '2', '3', '4'].map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={resetForm}>
+                  Batal
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="gradient-primary"
+                >
+                  {(createMutation.isPending || updateMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  {editingClass ? 'Simpan' : 'Tambah'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card className="shadow-elegant">
@@ -191,6 +245,8 @@ export default function KelolaKelas() {
                   <TableHead>No</TableHead>
                   <TableHead>Nama Kelas</TableHead>
                   <TableHead>Tingkat</TableHead>
+                  <TableHead>Jurusan</TableHead>
+                  <TableHead>Kelas</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -200,6 +256,8 @@ export default function KelolaKelas() {
                     <TableCell>{idx + 1}</TableCell>
                     <TableCell className="font-medium">{cls.name}</TableCell>
                     <TableCell>{cls.grade}</TableCell>
+                    <TableCell>{cls.major}</TableCell>
+                    <TableCell>{cls.section}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(cls)}>

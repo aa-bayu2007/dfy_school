@@ -115,7 +115,7 @@ export default function RiwayatAbsensi() {
     const counts = { hadir: 0, sakit: 0, izin: 0, alpha: 0, pending: 0, total: 0 };
     dayStatusMap.forEach(status => {
       const s = status as keyof typeof counts;
-      if (counts.hasOwnProperty(s)) {
+      if (Object.prototype.hasOwnProperty.call(counts, s)) {
         counts[s]++;
       }
       counts.total++;

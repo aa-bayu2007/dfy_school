@@ -218,7 +218,7 @@ export default function Dashboard() {
           .filter(
             (stat) =>
               !stat.showFor ||
-              stat.showFor.some((r) => roles.includes(r as any))
+              stat.showFor.some((r) => roles.includes(r as import('@/types/database').AppRole))
           )
           .map((stat) => (
             <Card key={stat.title} className="shadow-elegant">

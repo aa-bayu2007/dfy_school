@@ -2,13 +2,14 @@ package repositories
 
 import (
 	"backend/models"
+
 	"gorm.io/gorm"
 )
 
 type MasterRepository interface {
 	// Class
 	CreateClass(class *models.Class) error
-	UpdateClass(classID uint, name string, grade string, teacherID *uint) error
+	UpdateClass(classID uint, name string, grade string, major string, section string, teacherID *uint) error
 	DeleteClass(classID uint) error
 	GetAllClasses() ([]models.Class, error)
 	GetClassesByTeacher(teacherID uint) ([]models.Class, error)
@@ -106,10 +107,12 @@ func (r *masterRepository) GetAllDays() ([]models.Day, error) {
 }
 
 // Update implementations
-func (r *masterRepository) UpdateClass(classID uint, name string, grade string, teacherID *uint) error {
+func (r *masterRepository) UpdateClass(classID uint, name string, grade string, major string, section string, teacherID *uint) error {
 	updates := map[string]interface{}{
-		"name":  name,
-		"grade": grade,
+		"name":    name,
+		"grade":   grade,
+		"major":   major,
+		"section": section,
 	}
 	if teacherID != nil {
 		updates["teacher_id"] = *teacherID

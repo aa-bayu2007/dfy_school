@@ -10,6 +10,7 @@ export function useSchedules(classId?: string, teacherId?: string) {
       if (classId) params.append('class_id', classId);
       if (teacherId) params.append('teacher_id', teacherId);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = await apiClient.get<any[]>(`/schedules?${params.toString()}`);
       return data.map(s => ({
         ...s,

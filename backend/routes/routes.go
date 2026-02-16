@@ -50,6 +50,7 @@ func SetupRoutes(
 			admin := protected.Group("/admin")
 			admin.Use(middlewares.RoleMiddleware("admin"))
 			{
+				admin.POST("/users/import", adminH.ImportStudents)
 				admin.GET("/users", adminH.GetUsers)
 				admin.GET("/teachers", adminH.GetTeachers)
 				admin.GET("/classes", adminH.GetClasses)
@@ -57,7 +58,7 @@ func SetupRoutes(
 				admin.GET("/schedules", adminH.GetSchedules)
 				admin.GET("/time-slots", adminH.GetTimeSlots)
 				admin.GET("/days", adminH.GetDays)
-
+				admin.POST("/classes/migrate", adminH.MigrateClassData)
 				admin.POST("/classes", adminH.CreateClass)
 				admin.PUT("/classes/:id", adminH.UpdateClass)
 				admin.DELETE("/classes/:id", adminH.DeleteClass)
@@ -71,6 +72,7 @@ func SetupRoutes(
 				admin.DELETE("/schedules/:id", adminH.DeleteSchedule)
 				admin.DELETE("/schedules", adminH.ResetSchedules)
 
+				admin.POST("/users", adminH.CreateUser)
 				admin.PUT("/users/:id/role", adminH.UpdateUserRole)
 				admin.PUT("/users/:id/class", adminH.UpdateUserClass)
 			}

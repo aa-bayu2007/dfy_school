@@ -5,9 +5,12 @@ import (
 	"backend/pkg/response"
 	"backend/services"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xuri/excelize/v2"
 )
 
 type AdminHandler struct {
@@ -113,19 +116,93 @@ func (h *AdminHandler) UpdateUserClass(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success(nil))
 }
 
+func (h *AdminHandler) CreateUser(c *gin.Context) {
+	var input struct {
+		Name     string `json:"name" binding:"required"`
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required,min=6"`
+		Role     string `json:"role" binding:"required"`
+		ClassID  *uint  `json:"class_id"`
+		NIS      string `json:"nis"`
+		NIP      string `json:"nip"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("Invalid input: "+err.Error()))
+		return
+	}
+
+	validRoles := map[string]bool{
+		"admin":       true,
+		"guru":        true,
+		"murid":       true,
+		"ketua_kelas": true,
+	}
+	if !validRoles[input.Role] {
+		c.JSON(http.StatusBadRequest, response.Error("Invalid role"))
+		return
+	}
+
+	switch input.Role {
+	case "guru":
+		input.ClassID = nil
+		input.NIS = ""
+	case "admin":
+		input.ClassID = nil
+		input.NIS = ""
+		input.NIP = ""
+	default:
+		input.NIP = ""
+	}
+
+	if input.NIS != "" {
+		if match, _ := regexp.MatchString(`^\d+$`, input.NIS); !match {
+			c.JSON(http.StatusBadRequest, response.Error("NIS must be numeric"))
+			return
+		}
+	}
+	if input.NIP != "" {
+		if match, _ := regexp.MatchString(`^\d+$`, input.NIP); !match {
+			c.JSON(http.StatusBadRequest, response.Error("NIP must be numeric"))
+			return
+		}
+	}
+
+	user := models.User{
+		Name:     input.Name,
+		Email:    input.Email,
+		Password: input.Password,
+		Role:     input.Role,
+		ClassID:  input.ClassID,
+	}
+
+	profile := models.Profile{
+		NIS: input.NIS,
+		NIP: input.NIP,
+	}
+
+	if err := h.authService.CreateUser(&user, &profile); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusCreated, response.Success(gin.H{"message": "User created successfully", "user_id": user.ID}))
+}
+
 func (h *AdminHandler) CreateClass(c *gin.Context) {
 	var input struct {
-		Name      string `json:"name" binding:"required"`
-		Grade     string `json:"grade"`
+		Grade     string `json:"grade" binding:"required"`
+		Major     string `json:"major" binding:"required"`
+		Section   string `json:"section" binding:"required"`
 		TeacherID *uint  `json:"teacher_id"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error("Invalid input"))
+		c.JSON(http.StatusBadRequest, response.Error("Invalid input: "+err.Error()))
 		return
 	}
 
-	if err := h.masterService.CreateClass(input.Name, input.Grade, input.TeacherID); err != nil {
+	if err := h.masterService.CreateClass(input.Grade, input.Major, input.Section, input.TeacherID); err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
@@ -212,8 +289,9 @@ func (h *AdminHandler) UpdateClass(c *gin.Context) {
 	}
 
 	var input struct {
-		Name      string `json:"name" binding:"required"`
-		Grade     string `json:"grade"`
+		Grade     string `json:"grade" binding:"required"`
+		Major     string `json:"major" binding:"required"`
+		Section   string `json:"section" binding:"required"`
 		TeacherID *uint  `json:"teacher_id"`
 	}
 
@@ -222,7 +300,7 @@ func (h *AdminHandler) UpdateClass(c *gin.Context) {
 		return
 	}
 
-	if err := h.masterService.UpdateClass(uint(classID), input.Name, input.Grade, input.TeacherID); err != nil {
+	if err := h.masterService.UpdateClass(uint(classID), input.Grade, input.Major, input.Section, input.TeacherID); err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
@@ -337,4 +415,97 @@ func (h *AdminHandler) GetDays(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(days))
+}
+
+func (h *AdminHandler) MigrateClassData(c *gin.Context) {
+	if err := h.masterService.MigrateClassData(); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(nil))
+}
+
+func (h *AdminHandler) ImportStudents(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("Failed to get file: "+err.Error()))
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Failed to open file: "+err.Error()))
+		return
+	}
+	defer src.Close()
+
+	f, err := excelize.OpenReader(src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Failed to read excel: "+err.Error()))
+		return
+	}
+	defer f.Close()
+
+	// Get all rows from the first sheet
+	rows, err := f.GetRows(f.GetSheetList()[0])
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Failed to get rows: "+err.Error()))
+		return
+	}
+
+	if len(rows) < 2 {
+		c.JSON(http.StatusBadRequest, response.Error("Excel file is empty or missing header"))
+		return
+	}
+
+	// Fetch all classes to map Name -> ID
+	classes, err := h.masterService.GetAllClasses()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Failed to fetch classes for mapping"))
+		return
+	}
+	classMap := make(map[string]uint)
+	for _, cls := range classes {
+		classMap[strings.ToUpper(cls.Name)] = cls.ID
+	}
+
+	var students []services.StudentImportData
+	// Skip header (row 0)
+	for i := 1; i < len(rows); i++ {
+		row := rows[i]
+		if len(row) < 4 {
+			continue // Skip incomplete rows
+		}
+
+		name := row[0]
+		email := row[1]
+		nis := row[2]
+		className := strings.ToUpper(row[3])
+		password := "123456" // Default password if not provided
+		if len(row) >= 5 && row[4] != "" {
+			password = row[4]
+		}
+
+		classID, ok := classMap[className]
+		if !ok {
+			c.JSON(http.StatusBadRequest, response.Error("Class not found: "+className+" at row "+strconv.Itoa(i+1)))
+			return
+		}
+
+		students = append(students, services.StudentImportData{
+			Name:     name,
+			Email:    email,
+			NIS:      nis,
+			ClassID:  classID,
+			Password: password,
+		})
+	}
+
+	if err := h.authService.ImportStudents(students); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Failed to import students: "+err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(gin.H{"message": "Successfully imported " + strconv.Itoa(len(students)) + " students"}))
 }
