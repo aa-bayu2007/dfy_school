@@ -26,6 +26,7 @@ import {
   GraduationCap,
   ScanLine,
   UserCog,
+  UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +35,7 @@ const menuItems = {
     { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
     { title: 'Jadwal Pelajaran', url: '/dashboard/jadwal', icon: Calendar },
     { title: 'QR Code Saya', url: '/dashboard/qr-code', icon: QrCode },
+    { title: 'Vote KM', url: '/dashboard/vote-km', icon: UserCheck },
     { title: 'Riwayat Absensi', url: '/dashboard/absensi', icon: ClipboardList },
     { title: 'Ajukan Izin', url: '/dashboard/izin', icon: FileText },
   ],
@@ -42,6 +44,7 @@ const menuItems = {
     { title: 'Scan Absensi', url: '/dashboard/scan', icon: ScanLine },
     { title: 'Jadwal Pelajaran', url: '/dashboard/jadwal', icon: Calendar },
     { title: 'QR Code Saya', url: '/dashboard/qr-code', icon: QrCode },
+    { title: 'Vote KM', url: '/dashboard/vote-km', icon: UserCheck },
     { title: 'Absensi Kelas', url: '/dashboard/absensi-kelas', icon: ClipboardList },
     { title: 'Ajukan Izin', url: '/dashboard/izin', icon: FileText },
   ],
@@ -75,8 +78,8 @@ export default function AppSidebar() {
       const items = [...menuItems.guru];
       // Wali Kelas check: if guru has a class_id
       if (profile?.class_id) {
-        // Find position to insert after 'Dashboard' or just push
         items.splice(1, 0, { title: 'Daftar Siswa', url: '/dashboard/absensi-kelas', icon: Users });
+        items.splice(2, 0, { title: 'Vote KM', url: '/dashboard/vote-km', icon: UserCheck });
       }
       return items;
     }

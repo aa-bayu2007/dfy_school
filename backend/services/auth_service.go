@@ -22,6 +22,7 @@ type AuthService interface {
 	UpdateUserClass(userID uint, classID *uint) error
 	CreateUser(user *models.User, profile *models.Profile) error
 	ImportStudents(students []StudentImportData) error
+	GetStudentsByClass(classID uint) ([]models.User, error)
 }
 
 type StudentImportData struct {
@@ -239,4 +240,8 @@ func (s *authService) ImportStudents(students []StudentImportData) error {
 	}
 
 	return tx.Commit().Error
+}
+
+func (s *authService) GetStudentsByClass(classID uint) ([]models.User, error) {
+	return s.userRepo.GetStudentsByClass(classID)
 }

@@ -3,6 +3,10 @@ package routes
 import (
 	controllers "backend/controller"
 	middlewares "backend/middleware"
+	"backend/models"
+	"backend/pkg/response"
+	"backend/services"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,6 +19,9 @@ func SetupRoutes(
 	reqH *controllers.RequestHandler,
 	studentH *controllers.StudentHandler,
 	notifH *controllers.NotificationHandler,
+	votingH *controllers.VotingHandler,
+	masterS services.MasterService,
+	authS services.AuthService,
 ) {
 	api := r.Group("/api")
 	{
@@ -75,6 +82,43 @@ func SetupRoutes(
 				admin.POST("/users", adminH.CreateUser)
 				admin.PUT("/users/:id/role", adminH.UpdateUserRole)
 				admin.PUT("/users/:id/class", adminH.UpdateUserClass)
+			}
+
+			voting := protected.Group("/voting")
+			{
+				voting.GET("/active", votingH.GetActiveSession)
+				voting.POST("/vote", votingH.CastVote)
+				voting.GET("/results/:id", votingH.GetSessionResults)
+
+				// Wali Kelas only routes
+				waliGroup := voting.Group("/")
+				waliGroup.Use(middlewares.RoleMiddleware("guru"))
+				{
+					waliGroup.POST("/session", votingH.CreateSession)
+					waliGroup.POST("/finish/:id", votingH.FinishSession)
+					waliGroup.POST("/demote", votingH.DemoteKetuaKelas)
+					waliGroup.GET("/students", func(c *gin.Context) {
+						// Filter students by class for Wali Kelas
+						u, _ := c.Get("user_id")
+						var teacherID uint
+						switch v := u.(type) {
+						case float64:
+							teacherID = uint(v)
+						case uint:
+							teacherID = v
+						}
+
+						// Fetch classes to get class ID
+						classes, _ := masterS.GetClassesByTeacher(teacherID)
+						if len(classes) == 0 {
+							c.JSON(http.StatusOK, response.Success([]models.User{}))
+							return
+						}
+						classID := classes[0].ID
+						students, _ := authS.GetStudentsByClass(classID)
+						c.JSON(http.StatusOK, response.Success(students))
+					})
+				}
 			}
 		}
 	}

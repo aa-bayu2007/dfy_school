@@ -55,6 +55,9 @@ func main() {
 		&models.Schedule{},
 		&models.Attendance{},
 		&models.AttendanceRequest{},
+		&models.VotingSession{},
+		&models.VotingCandidate{},
+		&models.Vote{},
 	)
 
 	if err != nil {

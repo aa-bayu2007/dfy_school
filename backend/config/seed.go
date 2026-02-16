@@ -3,8 +3,9 @@ package config
 import (
 	"backend/models"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
 	"log"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func hashPassword(password string) string {
@@ -103,7 +104,20 @@ func SeedData() {
 		Role:     "guru",
 	}
 	db.FirstOrCreate(&guru, models.User{Email: guru.Email})
-	db.FirstOrCreate(&models.Profile{UserID: guru.ID, NIP: "198501012010011001"}, models.Profile{UserID: guru.ID})
+
+	// Use Where and Assign to ensure NIP is updated even if profile exists
+	db.Where(models.Profile{UserID: guru.ID}).
+		Assign(models.Profile{NIP: "198501012010011001"}).
+		FirstOrCreate(&models.Profile{})
+
+	// Assign Budi Santoso as Wali Kelas for XII PPLG 1
+	db.Model(&models.Class{}).Where("name = ?", "XII PPLG 1").Update("teacher_id", guru.ID)
+	// Also update the user's class_id to show he is a Wali Kelas for that class in his profile
+	db.Model(&models.User{}).Where("id = ?", guru.ID).Update("class_id", guru.ID) // Wait, class_id should be the class ID
+
+	var targetClass models.Class
+	db.Where("name = ?", "XII PPLG 1").First(&targetClass)
+	db.Model(&models.User{}).Where("id = ?", guru.ID).Update("class_id", targetClass.ID)
 
 	// Seed Subjects (Now with TeacherID)
 	subjectsSeed := []models.Subject{

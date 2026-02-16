@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"backend/models"
+
 	"gorm.io/gorm"
 )
 
@@ -12,6 +13,7 @@ type UserRepository interface {
 	FindByID(id uint) (*models.User, error)
 	GetAllUsers() ([]models.User, error)
 	FindUsersByRole(roleName string) ([]models.User, error)
+	GetStudentsByClass(classID uint) ([]models.User, error)
 	GetDB() *gorm.DB
 }
 
@@ -52,6 +54,14 @@ func (r *userRepository) GetAllUsers() ([]models.User, error) {
 func (r *userRepository) FindUsersByRole(roleName string) ([]models.User, error) {
 	var users []models.User
 	err := r.db.Where("role = ?", roleName).
+		Preload("Class").Preload("Profile").
+		Find(&users).Error
+	return users, err
+}
+
+func (r *userRepository) GetStudentsByClass(classID uint) ([]models.User, error) {
+	var users []models.User
+	err := r.db.Where("role = ? AND class_id = ?", "murid", classID).
 		Preload("Class").Preload("Profile").
 		Find(&users).Error
 	return users, err
