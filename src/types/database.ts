@@ -17,6 +17,7 @@ export interface Profile {
   email?: string;
   role?: string;
   class?: Class;
+  tenure_ends_at?: string;
 }
 
 export interface UserRole {

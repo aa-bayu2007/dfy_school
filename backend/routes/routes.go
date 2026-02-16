@@ -6,7 +6,9 @@ import (
 	"backend/models"
 	"backend/pkg/response"
 	"backend/services"
+	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -108,14 +110,40 @@ func SetupRoutes(
 							teacherID = v
 						}
 
-						// Fetch classes to get class ID
-						classes, _ := masterS.GetClassesByTeacher(teacherID)
-						if len(classes) == 0 {
-							c.JSON(http.StatusOK, response.Success([]models.User{}))
-							return
+						log.Printf("[VotingStudents] TeacherID: %d (Raw type: %T)", teacherID, u)
+
+						// Check if class_id is passed as query param (fallback)
+						queryClassID := c.Query("class_id")
+						var classID uint
+						if queryClassID != "" {
+							parsedID, _ := strconv.ParseUint(queryClassID, 10, 32)
+							classID = uint(parsedID)
 						}
-						classID := classes[0].ID
-						students, _ := authS.GetStudentsByClass(classID)
+
+						if classID == 0 {
+							// Fetch classes to get class ID from teacher association
+							classes, err := masterS.GetClassesByTeacher(teacherID)
+							if err != nil {
+								log.Printf("[VotingStudents] Error GetClassesByTeacher: %v", err)
+							}
+
+							log.Printf("[VotingStudents] Found %d classes for teacher %d", len(classes), teacherID)
+
+							if len(classes) == 0 {
+								c.JSON(http.StatusOK, response.Success([]models.User{}))
+								return
+							}
+							classID = classes[0].ID
+						}
+
+						log.Printf("[VotingStudents] Using ClassID: %d", classID)
+
+						students, err := authS.GetStudentsByClass(classID)
+						if err != nil {
+							log.Printf("[VotingStudents] Error GetStudentsByClass: %v", err)
+						}
+						log.Printf("[VotingStudents] Successfully found %d students for class %d", len(students), classID)
+
 						c.JSON(http.StatusOK, response.Success(students))
 					})
 				}

@@ -76,7 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...backendUser,
         id: Number(backendUser.id || backendUser.ID),
         role: backendRole,
-        full_name: backendUser.name || backendUser.Name || 'User'
+        full_name: backendUser.name || backendUser.Name || 'User',
+        tenure_ends_at: backendUser.tenure_ends_at || backendUser.TenureEndsAt
       };
 
       localStorage.setItem('user_token', token);
@@ -125,7 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...backendUser,
         id: Number(backendUser.id || backendUser.ID),
         role: role,
-        full_name: backendUser.name || backendUser.Name || 'User'
+        full_name: backendUser.name || backendUser.Name || 'User',
+        tenure_ends_at: backendUser.tenure_ends_at || backendUser.TenureEndsAt
       };
 
       localStorage.setItem('user', JSON.stringify(standardizedUser));

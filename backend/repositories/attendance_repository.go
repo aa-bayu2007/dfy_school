@@ -45,8 +45,7 @@ func (r *attendanceRepository) GetHistory(studentID string, classID string, date
 	}
 
 	if classID != "" {
-		query = query.Joins("JOIN users ON users.id = attendances.student_id").
-			Where("users.class_id = ?", classID)
+		query = query.Where("attendances.class_id = ?", classID)
 	}
 
 	if date != "" {
@@ -108,8 +107,7 @@ func (r *attendanceRepository) GetMonthlyRecap(classID string, startDate string,
 			COUNT(DISTINCT CASE WHEN status = 'alpha' THEN DATE(date) END) as alpha,
 			COUNT(DISTINCT DATE(date)) as total_days
 		`).
-		Joins("JOIN users ON users.id = attendances.student_id").
-		Where("users.class_id = ? AND DATE(date) BETWEEN ? AND ?", classID, startDate, endDate).
+		Where("class_id = ? AND DATE(date) BETWEEN ? AND ?", classID, startDate, endDate).
 		Group("student_id").
 		Rows()
 

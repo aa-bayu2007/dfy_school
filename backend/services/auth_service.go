@@ -167,7 +167,42 @@ func (s *authService) UpdateUserRole(userID uint, roleName string) error {
 }
 
 func (s *authService) UpdateUserClass(userID uint, classID *uint) error {
-	return s.userRepo.GetDB().Model(&models.User{}).Where("id = ?", userID).Update("class_id", classID).Error
+	tx := s.userRepo.GetDB().Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	// Fetch user to check role
+	var user models.User
+	if err := tx.First(&user, userID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Update user's class_id
+	if err := tx.Model(&user).Update("class_id", classID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// If guru, also update the Class table to reflect Wali Kelas association
+	if user.Role == "guru" {
+		// 1. Clear teacher_id from any class currently assigned to this teacher
+		if err := tx.Model(&models.Class{}).Where("teacher_id = ?", userID).Update("teacher_id", nil).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		// 2. If a new class is assigned, set this teacher as its Wali Kelas
+		if classID != nil {
+			if err := tx.Model(&models.Class{}).Where("id = ?", *classID).Update("teacher_id", userID).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
+	}
+
+	return tx.Commit().Error
 }
 
 func (s *authService) CreateUser(user *models.User, profile *models.Profile) error {

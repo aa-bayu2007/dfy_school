@@ -27,6 +27,8 @@ type Attendance struct {
 	DeletedAt  gorm.DeletedAt   `gorm:"index" json:"-"`
 	StudentID  uint             `json:"student_id" gorm:"uniqueIndex:idx_student_schedule_date"`
 	Student    User             `json:"student" gorm:"foreignKey:StudentID"`
+	ClassID    uint             `json:"class_id"`
+	Class      Class            `json:"class" gorm:"foreignKey:ClassID"`
 	ScheduleID *uint            `json:"schedule_id" gorm:"uniqueIndex:idx_student_schedule_date"`
 	Schedule   Schedule         `json:"schedule" gorm:"foreignKey:ScheduleID"`
 	Date       time.Time        `json:"date" gorm:"type:date;uniqueIndex:idx_student_schedule_date"`

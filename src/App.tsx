@@ -23,6 +23,7 @@ import KelolaUsers from "./pages/admin/KelolaUsers";
 import KelolaJadwal from "./pages/admin/KelolaJadwal";
 import Profile from "./pages/Profile";
 import VoteKM from "./pages/VoteKM";
+import DaftarSiswa from "./pages/DaftarSiswa";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
                 <Route path="/dashboard/users" element={<KelolaUsers />} />
                 <Route path="/dashboard/kelola-jadwal" element={<KelolaJadwal />} />
                 <Route path="/dashboard/vote-km" element={<VoteKM />} />
+                <Route path="/dashboard/daftar-siswa" element={<DaftarSiswa />} />
               </Route>
             </Route>
 

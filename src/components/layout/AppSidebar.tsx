@@ -78,7 +78,7 @@ export default function AppSidebar() {
       const items = [...menuItems.guru];
       // Wali Kelas check: if guru has a class_id
       if (profile?.class_id) {
-        items.splice(1, 0, { title: 'Daftar Siswa', url: '/dashboard/absensi-kelas', icon: Users });
+        items.splice(1, 0, { title: 'Daftar Siswa', url: '/dashboard/daftar-siswa', icon: Users });
         items.splice(2, 0, { title: 'Vote KM', url: '/dashboard/vote-km', icon: UserCheck });
       }
       return items;

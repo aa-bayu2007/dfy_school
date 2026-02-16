@@ -58,6 +58,7 @@ func main() {
 		&models.VotingSession{},
 		&models.VotingCandidate{},
 		&models.Vote{},
+		&models.Notification{},
 	)
 
 	if err != nil {
