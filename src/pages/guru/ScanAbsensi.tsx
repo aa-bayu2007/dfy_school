@@ -92,15 +92,25 @@ export default function ScanAbsensi() {
       if (scannerRef.current) return; // Already running
 
       try {
-        const scanner = new Html5Qrcode('qr-reader');
+        const scanner = new Html5Qrcode('qr-reader', {
+          useBarCodeDetectorIfSupported: true, // MUCH faster on modern mobile browsers
+          verbose: false
+        } as any);
         scannerRef.current = scanner;
 
         await scanner.start(
           selectedCameraId, // Use specific device ID instead of generic facingMode
           {
-            fps: 15, // Higher FPS for better detection
+            fps: 20, // Higher FPS for smoother detection
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const qrboxSize = Math.floor(minEdge * 0.7); // 70% of the smallest dimension
+              return {
+                width: qrboxSize,
+                height: qrboxSize
+              };
+            },
             aspectRatio: 1.0,
-            // qrbox removed to allow full-screen scanning
           },
           async (decodedText) => {
             if (!mounted) return;
@@ -267,6 +277,10 @@ export default function ScanAbsensi() {
                   width: 100% !important;
                   height: 100% !important;
                   overflow: hidden;
+                  border: none !important;
+                }
+                #qr-shaded-region {
+                  border-radius: 0.5rem !important;
                 }
               `}</style>
 
