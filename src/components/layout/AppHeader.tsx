@@ -16,14 +16,15 @@ import { Bell, LogOut, User, Moon, Sun } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 
 export default function AppHeader() {
   const { user, profile, signOut, roles } = useAuth();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
   const { data: notifications } = useNotifications(user?.id);
   const { data: unreadCount } = useUnreadCount(user?.id);
   const markRead = useMarkNotificationRead();
-  const [isDark, setIsDark] = useState(false);
 
   const getRoleLabel = () => {
     if (roles.includes('admin')) return { label: 'ADMIN', class: 'border-primary/20 bg-primary/10 text-primary' };
@@ -34,14 +35,8 @@ export default function AppHeader() {
 
   const roleInfo = getRoleLabel();
 
-  useEffect(() => {
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    setIsDark(isDarkMode);
-  }, []);
-
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   const handleSignOut = async () => {
@@ -66,7 +61,7 @@ export default function AppHeader() {
 
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={toggleTheme}>
-          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
 
         <DropdownMenu>

@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/components/theme-provider";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
@@ -30,39 +31,41 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Sonner />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+      <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+        <TooltipProvider>
+          <Sonner />
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-            <Route element={<ProtectedRoute />}>
-              <Route element={<DashboardLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/dashboard/profile" element={<Profile />} />
-                <Route path="/dashboard/jadwal" element={<JadwalPelajaran />} />
-                <Route path="/dashboard/qr-code" element={<QRCodePage />} />
-                <Route path="/dashboard/absensi" element={<RiwayatAbsensi />} />
-                <Route path="/dashboard/izin" element={<AjukanIzin />} />
-                <Route path="/dashboard/scan" element={<ScanAbsensi />} />
-                <Route path="/dashboard/absensi-kelas" element={<RiwayatAbsensi />} />
-                <Route path="/dashboard/rekap" element={<RekapAbsensi />} />
-                <Route path="/dashboard/review-izin" element={<ReviewIzin />} />
-                <Route path="/dashboard/kelas" element={<KelolaKelas />} />
-                <Route path="/dashboard/mapel" element={<KelolaMapel />} />
-                <Route path="/dashboard/users" element={<KelolaUsers />} />
-                <Route path="/dashboard/kelola-jadwal" element={<KelolaJadwal />} />
-                <Route path="/dashboard/vote-km" element={<VoteKM />} />
-                <Route path="/dashboard/daftar-siswa" element={<DaftarSiswa />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<DashboardLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/dashboard/profile" element={<Profile />} />
+                  <Route path="/dashboard/jadwal" element={<JadwalPelajaran />} />
+                  <Route path="/dashboard/qr-code" element={<QRCodePage />} />
+                  <Route path="/dashboard/absensi" element={<RiwayatAbsensi />} />
+                  <Route path="/dashboard/izin" element={<AjukanIzin />} />
+                  <Route path="/dashboard/scan" element={<ScanAbsensi />} />
+                  <Route path="/dashboard/absensi-kelas" element={<RiwayatAbsensi />} />
+                  <Route path="/dashboard/rekap" element={<RekapAbsensi />} />
+                  <Route path="/dashboard/review-izin" element={<ReviewIzin />} />
+                  <Route path="/dashboard/kelas" element={<KelolaKelas />} />
+                  <Route path="/dashboard/mapel" element={<KelolaMapel />} />
+                  <Route path="/dashboard/users" element={<KelolaUsers />} />
+                  <Route path="/dashboard/kelola-jadwal" element={<KelolaJadwal />} />
+                  <Route path="/dashboard/vote-km" element={<VoteKM />} />
+                  <Route path="/dashboard/daftar-siswa" element={<DaftarSiswa />} />
+                </Route>
               </Route>
-            </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
