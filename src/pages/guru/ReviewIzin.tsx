@@ -25,6 +25,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { FileText, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { EmptyState } from '@/components/shared/EmptyState';
 
 export default function ReviewIzin() {
   const { user, profile, roles } = useAuth();
@@ -80,15 +83,11 @@ export default function ReviewIzin() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FileText className="h-6 w-6 text-primary" />
-          Review Izin/Sakit
-        </h1>
-        <p className="text-muted-foreground">
-          Kelola pengajuan izin dan sakit siswa
-        </p>
-      </div>
+      <PageHeader
+        title="Review Izin/Sakit"
+        description="Kelola pengajuan izin dan sakit siswa"
+        icon={FileText}
+      />
 
       <Tabs defaultValue="pending" className="w-full">
         <TabsList>
@@ -210,12 +209,12 @@ export default function ReviewIzin() {
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <CheckCircle className="h-12 w-12 text-success mb-4" />
-                  <p className="text-muted-foreground">
-                    Tidak ada pengajuan yang menunggu review
-                  </p>
-                </div>
+                <EmptyState
+                  title="Semua beres!"
+                  description="Tidak ada pengajuan yang menunggu review"
+                  icon={CheckCircle}
+                  className="py-12"
+                />
               )}
             </CardContent>
           </Card>
@@ -264,19 +263,20 @@ export default function ReviewIzin() {
                           <TableCell className="max-w-xs truncate">
                             {req.reason}
                           </TableCell>
-                          <TableCell>{getStatusBadge(req.status)}</TableCell>
+                          <TableCell>
+                            <StatusBadge status={req.status} />
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    Belum ada data pengajuan
-                  </p>
-                </div>
+                <EmptyState
+                  title="Belum ada data"
+                  description="Belum ada data pengajuan"
+                  icon={FileText}
+                />
               )}
             </CardContent>
           </Card>

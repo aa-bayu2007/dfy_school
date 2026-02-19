@@ -35,17 +35,45 @@ type MasterService interface {
 }
 
 type masterService struct {
-	repo repositories.MasterRepository
+	repo     repositories.MasterRepository
+	userRepo repositories.UserRepository
 }
 
-func NewMasterService(repo repositories.MasterRepository) MasterService {
-	return &masterService{repo}
+func NewMasterService(repo repositories.MasterRepository, userRepo repositories.UserRepository) MasterService {
+	return &masterService{repo, userRepo}
 }
 
 func (s *masterService) CreateClass(grade string, major string, section string, teacherID *uint) error {
 	name := fmt.Sprintf("%s %s %s", grade, major, section)
 	class := models.Class{Name: name, Grade: grade, Major: major, Section: section, TeacherID: teacherID}
-	return s.repo.CreateClass(&class)
+
+	tx := s.userRepo.GetDB().Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	// 1. Create the class
+	if err := tx.Create(&class).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// 2. If a teacher is assigned, sync User.class_id
+	if teacherID != nil {
+		// Clear teacher from any other class first
+		if err := tx.Model(&models.Class{}).Where("teacher_id = ? AND id != ?", *teacherID, class.ID).Update("teacher_id", nil).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		// Update user profile to point to this class
+		if err := tx.Model(&models.User{}).Where("id = ?", *teacherID).Update("class_id", class.ID).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
 }
 
 func (s *masterService) GetAllClasses() ([]models.Class, error) {
@@ -91,7 +119,53 @@ func (s *masterService) GetAllTimeSlots() ([]models.TimeSlot, error) {
 // Update implementations
 func (s *masterService) UpdateClass(classID uint, grade string, major string, section string, teacherID *uint) error {
 	name := fmt.Sprintf("%s %s %s", grade, major, section)
-	return s.repo.UpdateClass(classID, name, grade, major, section, teacherID)
+
+	tx := s.userRepo.GetDB().Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	// 1. Update the class itself
+	if err := tx.Model(&models.Class{}).Where("id = ?", classID).Updates(map[string]interface{}{
+		"name":       name,
+		"grade":      grade,
+		"major":      major,
+		"section":    section,
+		"teacher_id": teacherID,
+	}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// 2. Bilateral sync for teacher
+	if teacherID != nil {
+		// Clear this teacher from any other class
+		if err := tx.Model(&models.Class{}).Where("teacher_id = ? AND id != ?", *teacherID, classID).Update("teacher_id", nil).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		// Clear class_id from previous teacher of THIS class
+		// (Optional but good for cleanliness)
+		if err := tx.Model(&models.User{}).Where("class_id = ? AND role = ? AND id != ?", classID, "guru", *teacherID).Update("class_id", nil).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		// Update new teacher's record
+		if err := tx.Model(&models.User{}).Where("id = ?", *teacherID).Update("class_id", classID).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	} else {
+		// If teacherID is set to nil, clear class_id from any teacher pointing to this class
+		if err := tx.Model(&models.User{}).Where("class_id = ? AND role = ?", classID, "guru").Update("class_id", nil).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
 }
 
 func (s *masterService) UpdateSubject(subjectID uint, name string, code string, teacherID *uint) error {

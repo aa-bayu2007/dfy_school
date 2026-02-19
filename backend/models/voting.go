@@ -30,7 +30,9 @@ type VotingCandidate struct {
 
 type Vote struct {
 	gorm.Model
-	VotingSessionID uint `json:"voting_session_id" gorm:"uniqueIndex:idx_user_session"`
-	UserID          uint `json:"user_id" gorm:"uniqueIndex:idx_user_session"`
-	CandidateID     uint `json:"candidate_id"`
+	VotingSessionID uint            `json:"voting_session_id" gorm:"uniqueIndex:idx_user_session"`
+	UserID          uint            `json:"user_id" gorm:"uniqueIndex:idx_user_session"`
+	User            User            `json:"user" gorm:"foreignKey:UserID"`
+	CandidateID     uint            `json:"candidate_id"`
+	Candidate       VotingCandidate `json:"candidate" gorm:"foreignKey:CandidateID"`
 }

@@ -19,8 +19,9 @@ func NewAuthHandler(authService services.AuthService) *AuthHandler {
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var input struct {
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Email        string `json:"email" binding:"required"`
+		Password     string `json:"password" binding:"required"`
+		ExpectedRole string `json:"expected_role"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -28,7 +29,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, refreshToken, user, err := h.authService.Login(input.Email, input.Password)
+	token, refreshToken, user, err := h.authService.Login(input.Email, input.Password, input.ExpectedRole)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, response.Error(err.Error()))
 		return

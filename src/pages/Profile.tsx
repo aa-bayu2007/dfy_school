@@ -2,21 +2,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Mail, Shield, IdCard, GraduationCap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 export default function Profile() {
     const { profile, roles } = useAuth();
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <User className="h-6 w-6 text-primary" />
-                    Profil Saya
-                </h1>
-                <p className="text-muted-foreground">
-                    Informasi akun dan data diri Anda
-                </p>
-            </div>
+            <PageHeader
+                title="Profil Saya"
+                description="Informasi akun dan data diri Anda"
+                icon={User}
+            />
 
             <div className="grid gap-6 md:grid-cols-2">
                 <Card className="shadow-elegant">

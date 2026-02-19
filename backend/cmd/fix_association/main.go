@@ -25,11 +25,15 @@ func main() {
 		return
 	}
 
-	// 3. Update Class to have Teacher ID
+	// 3. Clear Budi from ANY other classes first
+	db.Model(&models.Class{}).Where("teacher_id = ?", budi.ID).Update("teacher_id", nil)
+	fmt.Printf("🧹 Cleared %s from previous class assignments\n", budi.Name)
+
+	// 4. Update Target Class to have Teacher ID
 	db.Model(&class).Update("teacher_id", budi.ID)
 	fmt.Printf("✅ Assigned %s as teacher for %s\n", budi.Name, class.Name)
 
-	// 4. Update User Profile to have Class ID
+	// 5. Update User Profile to have Class ID
 	db.Model(&budi).Update("class_id", class.ID)
 	fmt.Printf("✅ Assigned class_id %d to %s profile\n", class.ID, budi.Name)
 }

@@ -46,7 +46,7 @@ func main() {
 
 	// Services
 	authService := services.NewAuthService(userRepo)
-	masterService := services.NewMasterService(masterRepo)
+	masterService := services.NewMasterService(masterRepo, userRepo)
 	attendService := services.NewAttendanceService(attendRepo, userRepo, masterRepo)
 	reqService := services.NewRequestService(requestRepo, attendRepo, userRepo, masterRepo)
 	notifService := services.NewNotificationService(notifRepo)

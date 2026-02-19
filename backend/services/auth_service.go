@@ -12,7 +12,7 @@ import (
 )
 
 type AuthService interface {
-	Login(identifier, password string) (string, string, *models.User, error)
+	Login(identifier, password, expectedRole string) (string, string, *models.User, error)
 	Register(user *models.User) error
 	GetMe(userID uint) (*models.User, error)
 	RefreshToken(tokenStr string) (string, string, error)
@@ -41,7 +41,7 @@ func NewAuthService(userRepo repositories.UserRepository) AuthService {
 	return &authService{userRepo}
 }
 
-func (s *authService) Login(identifier, password string) (string, string, *models.User, error) {
+func (s *authService) Login(identifier, password, expectedRole string) (string, string, *models.User, error) {
 	var user models.User
 	var err error
 
@@ -74,6 +74,27 @@ func (s *authService) Login(identifier, password string) (string, string, *model
 	if !utils.CheckPasswordHash(password, user.Password) {
 		log.Printf("[Login] Password mismatch for identifier: %s", identifier)
 		return "", "", nil, errors.New("invalid credentials")
+	}
+
+	// Validate role matches expected login form
+	if expectedRole != "" {
+		actualRole := user.Role
+		if actualRole == "" {
+			actualRole = "murid"
+		}
+		roleAllowed := false
+		switch expectedRole {
+		case "murid":
+			roleAllowed = actualRole == "murid" || actualRole == "student" || actualRole == "ketua_kelas"
+		case "guru":
+			roleAllowed = actualRole == "guru" || actualRole == "teacher"
+		case "admin":
+			roleAllowed = actualRole == "admin"
+		}
+		if !roleAllowed {
+			log.Printf("[Login] Role mismatch: expected=%s, actual=%s for user %s", expectedRole, actualRole, identifier)
+			return "", "", nil, errors.New("akun ini tidak terdaftar untuk login di form ini")
+		}
 	}
 
 	log.Printf("[Login] Success for user: %s (ID: %d, Role: %s)", user.Email, user.ID, user.Role)
@@ -243,7 +264,44 @@ func (s *authService) ImportStudents(students []StudentImportData) error {
 	}
 
 	for _, data := range students {
-		// Hass password
+		// Check if a user with this email already exists
+		var existingUser models.User
+		err := tx.Where("email = ?", data.Email).First(&existingUser).Error
+
+		if err == nil {
+			// User already exists — update their info instead of failing
+			existingUser.Name = data.Name
+			existingUser.ClassID = &data.ClassID
+			if err := tx.Save(&existingUser).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			// Update or create profile
+			var profile models.Profile
+			if err := tx.Where("user_id = ?", existingUser.ID).First(&profile).Error; err != nil {
+				// Profile doesn't exist, create one
+				profile = models.Profile{
+					UserID: existingUser.ID,
+					NIS:    data.NIS,
+				}
+				if err := tx.Create(&profile).Error; err != nil {
+					tx.Rollback()
+					return err
+				}
+			} else {
+				profile.NIS = data.NIS
+				if err := tx.Save(&profile).Error; err != nil {
+					tx.Rollback()
+					return err
+				}
+			}
+
+			log.Printf("[ImportStudents] Updated existing user: %s (%s)", data.Name, data.Email)
+			continue
+		}
+
+		// New user — hash password and create
 		hashed, err := utils.HashPassword(data.Password)
 		if err != nil {
 			tx.Rollback()
@@ -272,6 +330,8 @@ func (s *authService) ImportStudents(students []StudentImportData) error {
 			tx.Rollback()
 			return err
 		}
+
+		log.Printf("[ImportStudents] Created new user: %s (%s)", data.Name, data.Email)
 	}
 
 	return tx.Commit().Error

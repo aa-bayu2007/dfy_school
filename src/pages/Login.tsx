@@ -5,15 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, Loader2, User, ShieldCheck } from 'lucide-react';
+import { GraduationCap, Loader2, User, ShieldCheck, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loginType, setLoginType] = useState('user'); // 'user' | 'admin'
+  const [loginType, setLoginType] = useState<'siswa' | 'guru' | 'admin'>('siswa');
   const { signIn } = useAuth();
   const navigate = useNavigate();
 
@@ -22,8 +22,9 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Backend handles identifier automatically (email/nis/nip)
-      await signIn(identifier, password);
+      const expectedRole = loginType === 'siswa' ? 'murid' : loginType === 'guru' ? 'guru' : 'admin';
+      await signIn(identifier, password, expectedRole);
+      toast.success('Berhasil masuk!');
       navigate('/dashboard');
     } catch (error) {
       if (error instanceof Error) {
@@ -35,6 +36,26 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  const tabConfig = {
+    siswa: {
+      label: 'NIS',
+      placeholder: 'Masukkan NIS anda',
+      inputType: 'text',
+    },
+    guru: {
+      label: 'NIP',
+      placeholder: 'Masukkan NIP anda',
+      inputType: 'text',
+    },
+    admin: {
+      label: 'Email',
+      placeholder: 'admin@sekolah.com',
+      inputType: 'email',
+    },
+  };
+
+  const currentTab = tabConfig[loginType];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
@@ -48,13 +69,17 @@ export default function Login() {
         </CardHeader>
 
         <div className="px-6 pb-2">
-          <Tabs defaultValue="user" onValueChange={(v) => { setLoginType(v); setIdentifier(''); setPassword(''); }} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="user" className="flex items-center gap-2">
+          <Tabs defaultValue="siswa" onValueChange={(v) => { setLoginType(v as 'siswa' | 'guru' | 'admin'); setIdentifier(''); setPassword(''); }} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="siswa" className="flex items-center gap-1.5 text-xs sm:text-sm">
                 <User className="h-4 w-4" />
-                Siswa / Guru
+                Siswa
               </TabsTrigger>
-              <TabsTrigger value="admin" className="flex items-center gap-2">
+              <TabsTrigger value="guru" className="flex items-center gap-1.5 text-xs sm:text-sm">
+                <BookOpen className="h-4 w-4" />
+                Guru
+              </TabsTrigger>
+              <TabsTrigger value="admin" className="flex items-center gap-1.5 text-xs sm:text-sm">
                 <ShieldCheck className="h-4 w-4" />
                 Admin
               </TabsTrigger>
@@ -63,13 +88,11 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="mt-6">
               <CardContent className="space-y-4 p-0">
                 <div className="space-y-2">
-                  <Label htmlFor="identifier">
-                    {loginType === 'user' ? 'NIS / NIP' : 'Email'}
-                  </Label>
+                  <Label htmlFor="identifier">{currentTab.label}</Label>
                   <Input
                     id="identifier"
-                    type={loginType === 'user' ? 'text' : 'email'}
-                    placeholder={loginType === 'user' ? 'Masukkan NIS atau NIP' : 'admin@sekolah.com'}
+                    type={currentTab.inputType}
+                    placeholder={currentTab.placeholder}
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     required

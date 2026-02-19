@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScanLine, Camera, StopCircle, CheckCircle, AlertCircle, RefreshCw, XCircle } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 export default function ScanAbsensi() {
   const { user, profile } = useAuth();
@@ -206,15 +207,11 @@ export default function ScanAbsensi() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ScanLine className="h-6 w-6 text-primary" />
-          Scan Absensi
-        </h1>
-        <p className="text-muted-foreground">
-          Scan QR code siswa untuk mencatat kehadiran (Desktop & Mobile Ready)
-        </p>
-      </div>
+      <PageHeader
+        title="Scan Absensi"
+        description="Scan QR code siswa untuk mencatat kehadiran (Desktop & Mobile Ready)"
+        icon={ScanLine}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Scanner Section */}
@@ -235,7 +232,7 @@ export default function ScanAbsensi() {
                 <div className="mt-2">
                   <Select
                     value={selectedCameraId}
-                    onValueChange={(val) => {
+                    onValueChange={(val: string) => {
                       setSelectedCameraId(val);
                       // If scanning, stop first to allow effect to restart with new camera
                       if (scanning) setScanning(false);

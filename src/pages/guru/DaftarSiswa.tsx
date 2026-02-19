@@ -16,6 +16,8 @@ import { Users, Hash, UserCircle, Search, ChevronLeft, ChevronRight, UserCheck }
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { EmptyState } from '@/components/shared/EmptyState';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -76,28 +78,23 @@ export default function DaftarSiswa() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Users className="h-6 w-6 text-primary" />
-                        Daftar Siswa
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Daftar siswa resmi di kelas {profile?.class?.name || '...'}
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <div className="bg-primary/5 px-4 py-2 rounded-lg border border-primary/10">
-                        <span className="text-sm font-bold text-primary">Total: {filteredStudents.length} Siswa</span>
+            <PageHeader
+                title="Daftar Siswa"
+                description={`Daftar siswa resmi di kelas ${profile?.class?.name || '...'}`}
+                icon={Users}
+                actions={
+                    <div className="flex items-center gap-3">
+                        <div className="bg-primary/5 px-4 py-2 rounded-lg border border-primary/10">
+                            <span className="text-sm font-bold text-primary">Total: {filteredStudents.length} Siswa</span>
+                        </div>
+                        {searchQuery && (
+                            <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')} className="text-xs h-8">
+                                Reset
+                            </Button>
+                        )}
                     </div>
-                    {searchQuery && (
-                        <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')} className="text-xs h-8">
-                            Reset
-                        </Button>
-                    )}
-                </div>
-            </div>
+                }
+            />
 
             <div className="flex items-center space-x-2 bg-card p-3 rounded-xl border shadow-sm max-w-md">
                 <Search className="h-4 w-4 text-muted-foreground ml-1" />
@@ -164,10 +161,10 @@ export default function DaftarSiswa() {
                             </Table>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <Users className="h-12 w-12 text-muted-foreground mb-4 opacity-20" />
-                            <p className="text-muted-foreground">Siswa tidak ditemukan</p>
-                        </div>
+                        <EmptyState
+                            title="Siswa tidak ditemukan"
+                            description="Tidak ada siswa yang cocok dengan kriteria pencarian Anda."
+                        />
                     )}
                 </CardContent>
             </Card>

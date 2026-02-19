@@ -86,6 +86,6 @@ func (r *votingRepository) HasUserVoted(userID uint, sessionID uint) (bool, erro
 
 func (r *votingRepository) GetVotesBySession(sessionID uint) ([]models.Vote, error) {
 	var votes []models.Vote
-	err := r.db.Where("voting_session_id = ?", sessionID).Find(&votes).Error
+	err := r.db.Preload("User").Preload("Candidate.Student").Where("voting_session_id = ?", sessionID).Order("created_at desc").Find(&votes).Error
 	return votes, err
 }

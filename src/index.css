@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 @layer base {
   :root {
@@ -98,37 +98,96 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 @layer utilities {
+
+  /* Role Themes - Light Mode Default */
+  .role-admin {
+    --primary: 240 60% 50%;
+    --accent: 260 80% 65%;
+    --sidebar-background: 240 50% 12%;
+    --sidebar-primary: 240 60% 50%;
+    --sidebar-accent: 240 50% 18%;
+    --hover-bg: 240 60% 50% / 0.08;
+  }
+
+  .role-guru {
+    --primary: 215 85% 48%;
+    --accent: 200 100% 60%;
+    --sidebar-background: 215 75% 15%;
+    --sidebar-primary: 215 85% 48%;
+    --sidebar-accent: 215 75% 22%;
+    --hover-bg: 215 85% 48% / 0.08;
+  }
+
+  .role-murid {
+    --primary: 195 45% 45%;
+    --accent: 180 40% 55%;
+    --sidebar-background: 205 45% 18%;
+    --sidebar-primary: 195 45% 45%;
+    --sidebar-accent: 205 45% 25%;
+    --hover-bg: 195 45% 45% / 0.08;
+  }
+
+  /* Role Themes - Dark Mode Specific Overrides */
+  .dark .role-admin {
+    --primary: 240 65% 65%;
+    --accent: 260 90% 75%;
+    --sidebar-background: 240 60% 8%;
+    --sidebar-primary: 240 65% 65%;
+    --sidebar-accent: 240 60% 15%;
+    --hover-bg: 240 65% 65% / 0.12;
+  }
+
+  .dark .role-guru {
+    --primary: 215 90% 65%;
+    --accent: 200 100% 75%;
+    --sidebar-background: 215 85% 10%;
+    --sidebar-primary: 215 90% 65%;
+    --sidebar-accent: 215 85% 18%;
+    --hover-bg: 215 90% 65% / 0.12;
+  }
+
+  .dark .role-murid {
+    --primary: 195 60% 60%;
+    --accent: 180 50% 70%;
+    --sidebar-background: 205 65% 12%;
+    --sidebar-primary: 195 60% 60%;
+    --sidebar-accent: 205 65% 18%;
+    --hover-bg: 195 60% 60% / 0.12;
+  }
+
   .gradient-primary {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
   }
-  
+
   .gradient-card {
     background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
   }
-  
+
   .shadow-elegant {
     box-shadow: 0 10px 40px -10px hsl(var(--primary) / 0.15);
   }
-  
+
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
   }
-  
+
   @keyframes fadeIn {
     from {
       opacity: 0;
       transform: translateY(10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);

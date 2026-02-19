@@ -18,6 +18,9 @@ import {
   Check,
   Flag
 } from 'lucide-react';
+import { StatCard } from '@/components/shared/StatCard';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 
 export default function Dashboard() {
   const { profile, roles, user } = useAuth();
@@ -212,7 +215,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats
           .filter(
@@ -221,19 +223,14 @@ export default function Dashboard() {
               stat.showFor.some((r) => roles.includes(r as import('@/types/database').AppRole))
           )
           .map((stat) => (
-            <Card key={stat.title} className="shadow-elegant">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    <p className="text-3xl font-bold">{stat.value}</p>
-                  </div>
-                  <div className={`p-3 rounded-full ${stat.bgColor}`}>
-                    <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              key={stat.title}
+              title={stat.title}
+              value={stat.value}
+              icon={stat.icon}
+              colorClass={stat.color}
+              bgColorClass={stat.bgColor}
+            />
           ))}
       </div>
 
@@ -579,12 +576,11 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-12">
-              <Clock className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                Belum ada jadwal atau data absensi untuk hari ini.
-              </p>
-            </div>
+            <EmptyState
+              title="Belum ada data"
+              description="Belum ada jadwal atau data absensi untuk hari ini."
+              icon={Clock}
+            />
           )}
         </CardContent>
       </Card>
