@@ -50,8 +50,9 @@ func (h *AttendanceHandler) GetHistory(c *gin.Context) {
 	studentID := c.Query("student_id")
 	classID := c.Query("class_id")
 	date := c.Query("date")
+	scannedBy := c.Query("scanned_by")
 
-	history, err := h.attendService.GetHistory(studentID, classID, date)
+	history, err := h.attendService.GetHistory(studentID, classID, date, scannedBy)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error("Failed to fetch history"))
 		return

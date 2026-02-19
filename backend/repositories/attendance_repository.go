@@ -10,7 +10,7 @@ import (
 type AttendanceRepository interface {
 	Create(attendance *models.Attendance) error
 	FindByStudentAndSchedule(studentID uint, scheduleID uint, date string) (*models.Attendance, error)
-	GetHistory(studentID string, classID string, date string) ([]models.Attendance, error)
+	GetHistory(studentID string, classID string, date string, scannedBy string) ([]models.Attendance, error)
 	GetDailyQRCode(studentID uint, date string) (*models.DailyQRCode, error)
 	SaveDailyQRCode(qr *models.DailyQRCode) error
 	GetStats(classID string, startDate string, endDate string) ([]map[string]interface{}, error)
@@ -37,8 +37,10 @@ func (r *attendanceRepository) FindByStudentAndSchedule(studentID uint, schedule
 	return &attendance, err
 }
 
-func (r *attendanceRepository) GetHistory(studentID string, classID string, date string) ([]models.Attendance, error) {
-	query := r.db.Preload("Student.Class").Preload("Student.Profile").Preload("Schedule.Subject").Preload("Schedule.Day").Preload("Schedule.TimeSlot")
+func (r *attendanceRepository) GetHistory(studentID string, classID string, date string, scannedBy string) ([]models.Attendance, error) {
+	query := r.db.Preload("Student.Class").Preload("Student.Profile").
+		Preload("Schedule.Subject").Preload("Schedule.Day").Preload("Schedule.TimeSlot").
+		Preload("Scanner.Profile").Preload("Scanner")
 
 	if studentID != "" {
 		query = query.Where("student_id = ?", studentID)
@@ -49,11 +51,15 @@ func (r *attendanceRepository) GetHistory(studentID string, classID string, date
 	}
 
 	if date != "" {
-		query = query.Where("DATE(date) = ?", date)
+		query = query.Where("DATE(attendances.date) = ?", date)
+	}
+
+	if scannedBy != "" {
+		query = query.Where("scanned_by = ?", scannedBy)
 	}
 
 	var attendances []models.Attendance
-	err := query.Order("date DESC, created_at DESC").Find(&attendances).Error
+	err := query.Order("attendances.date DESC, attendances.created_at DESC").Find(&attendances).Error
 	return attendances, err
 }
 

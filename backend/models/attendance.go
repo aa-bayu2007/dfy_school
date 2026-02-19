@@ -1,8 +1,9 @@
 package models
 
 import (
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type AttendanceStatus string
@@ -34,6 +35,7 @@ type Attendance struct {
 	Date       time.Time        `json:"date" gorm:"type:date;uniqueIndex:idx_student_schedule_date"`
 	Status     AttendanceStatus `json:"status"`
 	ScannedBy  *uint            `json:"scanned_by"`
+	Scanner    *User            `gorm:"foreignKey:ScannedBy" json:"scanner"`
 	ScannedAt  *time.Time       `json:"scanned_at"`
 	Notes      string           `json:"notes"`
 }

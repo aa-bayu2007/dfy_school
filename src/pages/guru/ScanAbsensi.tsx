@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRecordAttendance } from '@/hooks/useAttendance';
+import { useRecordAttendance, useAttendance } from '@/hooks/useAttendance';
 import { useSchedulesByDay } from '@/hooks/useSchedules';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,26 @@ import { PageHeader } from '@/components/shared/PageHeader';
 export default function ScanAbsensi() {
   const { user, profile } = useAuth();
   const [scanning, setScanning] = useState(false);
-  const [scannedStudents, setScannedStudents] = useState<Array<{ name: string; time: string; status: 'success' | 'error' }>>([]);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const { data: attendances, refetch: refetchHistory } = useAttendance(
+    undefined,
+    undefined,
+    todayStr,
+    user?.id
+  );
+
+  // Derived history from persistent attendance records - sorted latest first
+  const scannedStudents = [...(attendances || [])]
+    .sort((a, b) => new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime())
+    .map(att => ({
+      name: `${att.student?.full_name || att.student?.name || 'Siswa'} ${att.status === 'hadir' ? '(Hadir)' : ''}`,
+      time: att.scanned_at ? new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+      status: (att.status === 'hadir' ? 'success' : 'error') as 'success' | 'error'
+    }));
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedCodesRef = useRef<Set<string>>(new Set());
@@ -92,25 +108,21 @@ export default function ScanAbsensi() {
       if (scannerRef.current) return; // Already running
 
       try {
-        const scanner = new Html5Qrcode('qr-reader', {
-          useBarCodeDetectorIfSupported: true, // MUCH faster on modern mobile browsers
-          verbose: false
-        } as any);
+        const scanner = new Html5Qrcode('qr-reader', false);
         scannerRef.current = scanner;
 
         await scanner.start(
           selectedCameraId, // Use specific device ID instead of generic facingMode
           {
-            fps: 20, // Higher FPS for smoother detection
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-              const qrboxSize = Math.floor(minEdge * 0.7); // 70% of the smallest dimension
-              return {
-                width: qrboxSize,
-                height: qrboxSize
-              };
-            },
+            fps: 15,
+            qrbox: { width: 280, height: 280 },
             aspectRatio: 1.0,
+            // Try to get a decent resolution if available
+            videoConstraints: {
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
+              facingMode: "environment"
+            }
           },
           async (decodedText) => {
             if (!mounted) return;
@@ -149,14 +161,8 @@ export default function ScanAbsensi() {
               const studentName = result.student_name || "Siswa";
               toast.success(`Berhasil: ${studentName}`);
 
-              setScannedStudents((prev) => [
-                {
-                  name: `${studentName} ${result.is_full_day ? '(Full Masuk)' : '(Hadir)'}`,
-                  time: new Date().toLocaleTimeString('id-ID'),
-                  status: 'success'
-                },
-                ...prev,
-              ]);
+              // Refetch history to show the update
+              refetchHistory();
 
               const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1...');
               audio.play().catch(() => { });
@@ -175,15 +181,6 @@ export default function ScanAbsensi() {
               setScanStatus('error');
               const message = error instanceof Error ? error.message : "Gagal mencatat kehadiran";
               toast.error(message);
-
-              setScannedStudents((prev) => [
-                {
-                  name: `Gagal Scan: ${decodedText.substring(0, 10)}...`,
-                  time: new Date().toLocaleTimeString('id-ID'),
-                  status: 'error'
-                },
-                ...prev,
-              ]);
 
               // Resume scanning after delay
               setTimeout(() => {
@@ -210,7 +207,7 @@ export default function ScanAbsensi() {
     return () => {
       mounted = false;
     };
-  }, [scanning, user?.id, selectedCameraId, recordAttendance]);
+  }, [scanning, selectedCameraId]); // Removed recordAttendance and user?.id to prevent re-render loop
 
   const startScanning = () => setScanning(true);
   const stopScanning = () => setScanning(false);
