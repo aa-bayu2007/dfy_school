@@ -263,7 +263,7 @@ export default function RiwayatAbsensi() {
                           <StatusBadge status={att.status} />
                         </TableCell>
                         <TableCell className="py-4">
-                          {att.scanned_at ? (
+                          {att.status === 'hadir' && att.scanned_at ? (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
                               <Clock className="h-3 w-3 opacity-60" />
                               {new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
@@ -274,13 +274,13 @@ export default function RiwayatAbsensi() {
                         </TableCell>
                         {(isClassView || roles.includes('admin') || roles.includes('guru')) && (
                           <TableCell className="py-4">
-                            {att.scanner ? (
+                            {att.status === 'hadir' && att.scanner ? (
                               <div className="flex items-center gap-1.5">
                                 <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20 text-primary px-1.5 py-0">
                                   {att.scanner.full_name || att.scanner.name || 'Petugas'}
                                 </Badge>
                               </div>
-                            ) : att.notes === "Auto-generated" ? (
+                            ) : att.status === 'hadir' && att.notes === "Auto-generated" ? (
                               <span className="text-[10px] text-muted-foreground italic">Sistem</span>
                             ) : (
                               <span className="text-[10px] text-muted-foreground opacity-40">-</span>
