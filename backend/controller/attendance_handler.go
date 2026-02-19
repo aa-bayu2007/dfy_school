@@ -129,7 +129,7 @@ func (h *AttendanceHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.attendService.UpdateStatus(uint(attendanceID), input.Status, input.Notes); err != nil {
+	if err := h.attendService.UpdateStatus(uint(attendanceID), input.Status, input.Notes, nil); err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}

@@ -92,6 +92,7 @@ export interface Attendance {
   status: AttendanceStatus;
   scanned_by?: number;
   scanned_at?: string;
+  approved_at?: string;
   notes?: string;
   created_at: string;
   updated_at?: string;

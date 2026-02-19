@@ -15,7 +15,7 @@ type AttendanceRepository interface {
 	SaveDailyQRCode(qr *models.DailyQRCode) error
 	GetStats(classID string, startDate string, endDate string) ([]map[string]interface{}, error)
 	UpdateStatusForRemainingSchedules(studentID uint, date string, timeTime time.Time, status string) error
-	UpdateStatus(attendanceID uint, status models.AttendanceStatus, notes string) error
+	UpdateStatus(attendanceID uint, status models.AttendanceStatus, notes string, approvedAt *time.Time) error
 	GetMonthlyRecap(classID string, startDate string, endDate string) ([]map[string]interface{}, error)
 }
 
@@ -156,12 +156,15 @@ func (r *attendanceRepository) UpdateStatusForRemainingSchedules(studentID uint,
 		)`, status, time.Now(), studentID, date, currentTime).Error
 }
 
-func (r *attendanceRepository) UpdateStatus(attendanceID uint, status models.AttendanceStatus, notes string) error {
+func (r *attendanceRepository) UpdateStatus(attendanceID uint, status models.AttendanceStatus, notes string, approvedAt *time.Time) error {
 	updates := map[string]interface{}{
 		"status": status,
 	}
 	if notes != "" {
 		updates["notes"] = notes
+	}
+	if approvedAt != nil {
+		updates["approved_at"] = approvedAt
 	}
 	return r.db.Model(&models.Attendance{}).Where("id = ?", attendanceID).Updates(updates).Error
 }

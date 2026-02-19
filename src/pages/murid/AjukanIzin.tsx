@@ -33,7 +33,8 @@ import {
   XCircle,
   Loader2,
   BookOpen,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -238,12 +239,24 @@ export default function AjukanIzin() {
                 </div>
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
+                <div className="flex-1 flex flex-col items-start">
+                  {date && requests?.some(r => format(new Date(r.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')) && (
+                    <p className="text-[10px] text-destructive font-bold flex items-center gap-1 animate-pulse">
+                      <AlertCircle className="h-3 w-3" />
+                      Sudah ada pengajuan pada tanggal ini
+                    </p>
+                  )}
+                </div>
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Batal
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={createRequest.isPending}
+                  disabled={
+                    createRequest.isPending ||
+                    !date ||
+                    requests?.some(r => format(new Date(r.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'))
+                  }
                   className="gradient-primary"
                 >
                   {createRequest.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

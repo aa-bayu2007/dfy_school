@@ -12,10 +12,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ScanLine, Camera, StopCircle, CheckCircle, AlertCircle, RefreshCw, XCircle } from 'lucide-react';
+import { ScanLine, Camera, StopCircle, CheckCircle, AlertCircle, RefreshCw, XCircle, Clock } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { cn } from '@/lib/utils';
 
 export default function ScanAbsensi() {
   const { user, profile } = useAuth();
@@ -35,11 +36,23 @@ export default function ScanAbsensi() {
   // Derived history from persistent attendance records - sorted latest first
   const scannedStudents = [...(attendances || [])]
     .sort((a, b) => new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime())
-    .map(att => ({
-      name: `${att.student?.full_name || att.student?.name || 'Siswa'} ${att.status === 'hadir' ? '(Hadir)' : ''}`,
-      time: att.scanned_at ? new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
-      status: (att.status === 'hadir' ? 'success' : 'error') as 'success' | 'error'
-    }));
+    .map(att => {
+      let statusLabel = '';
+      if (att.status === 'hadir') {
+        statusLabel = '(Hadir)';
+      } else if (att.status === 'izin' || att.status === 'sakit') {
+        const timeStr = att.approved_at
+          ? new Date(att.approved_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+          : '';
+        statusLabel = `(${att.status === 'izin' ? 'Izin' : 'Sakit'}${timeStr ? ' pd jam ' + timeStr : ''})`;
+      }
+
+      return {
+        name: `${att.student?.full_name || att.student?.name || 'Siswa'} ${statusLabel}`,
+        time: att.scanned_at ? new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+        status: att.status as 'hadir' | 'sakit' | 'izin' | 'alpha' | 'pending' | 'success' | 'error'
+      };
+    });
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedCodesRef = useRef<Set<string>>(new Set());
@@ -337,7 +350,7 @@ export default function ScanAbsensi() {
 
             {/* Status Text Info */}
             <div className="text-center h-6">
-              {scanStatus === 'success' && <span className="text-success font-bold animate-pulse">Scan Berhasil!</span>}
+              {scanStatus === 'success' && <span className="text-success font-bold animate-pulse ">Scan Berhasil!</span>}
               {scanStatus === 'error' && <span className="text-destructive font-bold animate-pulse">Gagal Membaca QR / Data Invalid</span>}
               {scanStatus === 'scanning' && <span className="text-muted-foreground text-xs">Pastikan QR Code Terlihat Jelas</span>}
             </div>
@@ -362,17 +375,25 @@ export default function ScanAbsensi() {
                 {scannedStudents.map((student, index) => (
                   <div
                     key={index}
-                    className={`flex items-center justify-between p-3 rounded-lg animate-fade-in ${student.status === 'success' ? 'bg-success/10' : 'bg-destructive/10'}`}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg animate-fade-in transition-all border",
+                      student.status === 'hadir' || student.status === 'success' ? "bg-success/10 border-success/20 text-success" :
+                        student.status === 'izin' ? "bg-amber-500/10 border-amber-500/20 text-amber-500" :
+                          student.status === 'sakit' || student.status === 'error' ? "bg-destructive/10 border-destructive/20 text-destructive" :
+                            "bg-muted border-transparent"
+                    )}
                   >
                     <div className="flex items-center gap-3">
-                      {student.status === 'success' ? (
-                        <CheckCircle className="h-5 w-5 text-success" />
+                      {(student.status === 'hadir' || student.status === 'success') ? (
+                        <CheckCircle className="h-5 w-5" />
+                      ) : student.status === 'izin' ? (
+                        <Clock className="h-5 w-5" />
                       ) : (
-                        <XCircle className="h-5 w-5 text-destructive" />
+                        <XCircle className="h-5 w-5" />
                       )}
-                      <span className={`font-medium ${student.status === 'error' ? 'text-destructive' : ''}`}>{student.name}</span>
+                      <span className="font-bold tracking-tight">{student.name}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">{student.time}</span>
+                    <span className="text-sm font-bold opacity-70 font-mono tracking-tighter">{student.time}</span>
                   </div>
                 ))}
               </div>
