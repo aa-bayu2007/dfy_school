@@ -12,18 +12,35 @@ import (
 
 var DB *gorm.DB
 
+// Helper to get environment variable with a fallback key
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	if value, exists := os.LookupEnv(fallback); exists {
+		return value
+	}
+	return ""
+}
+
 func ConnectDatabase() {
 	// Load environment variables if not already loaded
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
 
+	dbUser := getEnv("DB_USER", "MYSQLUSER")
+	dbPass := getEnv("DB_PASSWORD", "MYSQLPASSWORD")
+	dbHost := getEnv("DB_HOST", "MYSQLHOST")
+	dbPort := getEnv("DB_PORT", "MYSQLPORT")
+	dbName := getEnv("DB_NAME", "MYSQLDATABASE")
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"),
+		dbUser,
+		dbPass,
+		dbHost,
+		dbPort,
+		dbName,
 	)
 
 	var err error
