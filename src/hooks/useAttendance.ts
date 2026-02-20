@@ -51,21 +51,34 @@ export function useRecordAttendance() {
     mutationFn: async ({
       qrCode,
       scannerId,
+      force,
     }: {
       qrCode: string;
-      scannerId: string | number;
+      scannerId: string;
+      force?: boolean;
     }) => {
-      return apiClient.post<any>('/attendance/scan', {
+      return apiClient.post<{
+        student_name: string;
+        is_full_day: boolean;
+        created_count: number;
+        total_schedules: number;
+        confirmation_required?: boolean;
+        message?: string;
+      }>('/attendance/scan', {
         qr_code: qrCode,
         scanner_id: Number(scannerId),
+        force,
       });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-stats'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-recap'] });
-      const name = data.student_name || data.attendance?.student?.name || 'Siswa';
-      toast.success(`Absensi ${name} berhasil dicatat!`);
+
+      if (!data.confirmation_required) {
+        const name = data.student_name || 'Siswa';
+        toast.success(`Absensi ${name} berhasil dicatat!`);
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);

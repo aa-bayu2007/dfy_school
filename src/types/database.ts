@@ -105,6 +105,7 @@ export interface AttendanceRequest {
   id: number;
   student_id: number;
   date: string;
+  end_date?: string;
   request_type: 'sakit' | 'izin';
   reason: string;
   attachment_url?: string;

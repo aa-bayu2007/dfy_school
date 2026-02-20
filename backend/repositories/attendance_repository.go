@@ -85,11 +85,24 @@ func (r *attendanceRepository) GetStats(classID string, startDate string, endDat
 	// It counts rows (subjects). If we want charts to be accurate per day, this should also change.
 	// But for now, let's focus on the RECAP TABLE which uses GetMonthlyRecap.
 
-	err := r.db.Model(&models.Attendance{}).
-		Select("status, COUNT(DISTINCT student_id) as count"). // unique students per status per period?
+	err := r.db.Table("attendances").
+		Select("daily_status as status, COUNT(*) as count").
+		Joins(`JOIN (
+			SELECT 
+				student_id, 
+				DATE(date) as date_only,
+				CASE 
+					WHEN MAX(CASE WHEN status = 'sakit' THEN 4 WHEN status = 'izin' THEN 3 WHEN status = 'alpha' THEN 2 WHEN status = 'hadir' THEN 1 ELSE 0 END) = 4 THEN 'sakit'
+					WHEN MAX(CASE WHEN status = 'sakit' THEN 4 WHEN status = 'izin' THEN 3 WHEN status = 'alpha' THEN 2 WHEN status = 'hadir' THEN 1 ELSE 0 END) = 3 THEN 'izin'
+					WHEN MAX(CASE WHEN status = 'sakit' THEN 4 WHEN status = 'izin' THEN 3 WHEN status = 'alpha' THEN 2 WHEN status = 'hadir' THEN 1 ELSE 0 END) = 2 THEN 'alpha'
+					ELSE 'hadir'
+				END as daily_status
+			FROM attendances
+			GROUP BY student_id, DATE(date)
+		) daily ON daily.student_id = attendances.student_id AND daily.date_only = DATE(attendances.date)`).
 		Joins("JOIN users ON users.id = attendances.student_id").
-		Where("users.class_id = ? AND DATE(date) BETWEEN ? AND ?", classID, startDate, endDate).
-		Group("status").
+		Where("users.class_id = ? AND DATE(attendances.date) BETWEEN ? AND ?", classID, startDate, endDate).
+		Group("daily_status").
 		Scan(&counts).Error
 
 	for _, c := range counts {
@@ -107,14 +120,27 @@ func (r *attendanceRepository) GetMonthlyRecap(classID string, startDate string,
 	rows, err := r.db.Table("attendances").
 		Select(`
 			student_id,
-			COUNT(DISTINCT CASE WHEN status = 'hadir' THEN DATE(date) END) as hadir,
-			COUNT(DISTINCT CASE WHEN status = 'sakit' THEN DATE(date) END) as sakit,
-			COUNT(DISTINCT CASE WHEN status = 'izin' THEN DATE(date) END) as izin,
-			COUNT(DISTINCT CASE WHEN status = 'alpha' THEN DATE(date) END) as alpha,
-			COUNT(DISTINCT DATE(date)) as total_days
+			COUNT(DISTINCT CASE WHEN daily_status = 'hadir' THEN date_only END) as hadir,
+			COUNT(DISTINCT CASE WHEN daily_status = 'sakit' THEN date_only END) as sakit,
+			COUNT(DISTINCT CASE WHEN daily_status = 'izin' THEN date_only END) as izin,
+			COUNT(DISTINCT CASE WHEN daily_status = 'alpha' THEN date_only END) as alpha,
+			COUNT(DISTINCT date_only) as total_days
 		`).
-		Where("class_id = ? AND DATE(date) BETWEEN ? AND ?", classID, startDate, endDate).
-		Group("student_id").
+		Joins(`JOIN (
+			SELECT 
+				student_id, 
+				DATE(date) as date_only,
+				CASE 
+					WHEN MAX(CASE WHEN status = 'sakit' THEN 4 WHEN status = 'izin' THEN 3 WHEN status = 'alpha' THEN 2 WHEN status = 'hadir' THEN 1 ELSE 0 END) = 4 THEN 'sakit'
+					WHEN MAX(CASE WHEN status = 'sakit' THEN 4 WHEN status = 'izin' THEN 3 WHEN status = 'alpha' THEN 2 WHEN status = 'hadir' THEN 1 ELSE 0 END) = 3 THEN 'izin'
+					WHEN MAX(CASE WHEN status = 'sakit' THEN 4 WHEN status = 'izin' THEN 3 WHEN status = 'alpha' THEN 2 WHEN status = 'hadir' THEN 1 ELSE 0 END) = 2 THEN 'alpha'
+					ELSE 'hadir'
+				END as daily_status
+			FROM attendances
+			GROUP BY student_id, DATE(date)
+		) daily ON daily.student_id = attendances.student_id AND daily.date_only = DATE(attendances.date)`).
+		Where("attendances.class_id = ? AND DATE(attendances.date) BETWEEN ? AND ?", classID, startDate, endDate).
+		Group("attendances.student_id").
 		Rows()
 
 	if err != nil {

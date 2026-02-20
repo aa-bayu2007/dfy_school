@@ -139,11 +139,17 @@ export default function ReviewIzin() {
                         <p className="text-sm">
                           <span className="font-medium">Tanggal:</span>{' '}
                           {new Date(req.date).toLocaleDateString('id-ID', {
-                            weekday: 'long',
                             day: 'numeric',
                             month: 'long',
                             year: 'numeric',
                           })}
+                          {req.end_date && req.end_date !== req.date && (
+                            <> s/d {new Date(req.end_date).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}</>
+                          )}
                         </p>
                         <p className="text-sm">
                           <span className="font-medium">Alasan:</span> {req.reason}
@@ -248,7 +254,14 @@ export default function ReviewIzin() {
                             {req.student?.full_name}
                           </TableCell>
                           <TableCell>
-                            {new Date(req.date).toLocaleDateString('id-ID')}
+                            <div className="flex flex-col">
+                              <span>{new Date(req.date).toLocaleDateString('id-ID')}</span>
+                              {req.end_date && req.end_date !== req.date && (
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                  s/d {new Date(req.end_date).toLocaleDateString('id-ID')}
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
