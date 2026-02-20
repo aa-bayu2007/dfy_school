@@ -3,11 +3,12 @@ package config
 import (
 	"backend/models"
 	"log"
+	"os"
 	"strings"
+
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/crypto/bcrypt"
 )
-
 
 func hashPassword(password string) string {
 	bytes, _ := bcrypt.GenerateFromPassword([]byte(password), 14)
@@ -18,6 +19,17 @@ func SeedData() {
 	db := GetDB()
 
 	log.Println("🌱 Starting database seeding...")
+
+	// Debug: Print current working directory
+	if cwd, err := os.Getwd(); err == nil {
+		log.Println("Current working directory:", cwd)
+	}
+	// Debug: Check if excel file exists
+	if _, err := os.Stat("data/siswa.xlsx"); os.IsNotExist(err) {
+		log.Println("⚠️ data/siswa.xlsx NOT FOUND in current directory!")
+	} else {
+		log.Println("✅ data/siswa.xlsx found!")
+	}
 
 	// Seed Permissions
 	permissions := []models.Permission{
@@ -126,11 +138,15 @@ func SeedData() {
 		defer f.Close()
 		rows, _ := f.GetRows(f.GetSheetName(0))
 		for i, row := range rows {
-			if i == 0 || len(row) < 3 { continue }
+			if i == 0 || len(row) < 3 {
+				continue
+			}
 			nis := strings.TrimSpace(row[1])
 			nama := strings.TrimSpace(row[2])
-			if nis == "" || nama == "" { continue }
-			
+			if nis == "" || nama == "" {
+				continue
+			}
+
 			user := models.User{
 				Name: nama, Email: nis + "@student.com", Password: hashPassword(nis),
 				Role: "murid", ClassID: &xiiPplg1.ID,
@@ -143,7 +159,7 @@ func SeedData() {
 		log.Printf("Seeded %d students from Excel", studentCount)
 	} else {
 		log.Printf("⚠️  Excel failed (%v), seeding mock students for XII PPLG 1", err)
-		mockStudents := []struct{Name, NIS string}{
+		mockStudents := []struct{ Name, NIS string }{
 			{"Ahmad Fauzi", "2024001"},
 			{"Siti Rohmah", "2024002"},
 			{"Budi Pratama", "2024003"},
