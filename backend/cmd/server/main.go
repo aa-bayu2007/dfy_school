@@ -18,7 +18,12 @@ func main() {
 	db := config.GetDB()
 
 	// Auto Migration
+	// Auto Migration
 	log.Println("Migrating database schema...")
+
+	// Temporarily disable foreign key checks to handle circular dependencies (User <-> Class)
+	db.Exec("SET FOREIGN_KEY_CHECKS=0")
+
 	db.AutoMigrate(
 		&models.Role{},
 		&models.Permission{},
@@ -36,6 +41,8 @@ func main() {
 		&models.VotingCandidate{},
 		&models.Vote{},
 	)
+
+	db.Exec("SET FOREIGN_KEY_CHECKS=1")
 
 	// Check if seeding is needed (e.g., if no roles exist)
 	var roleCount int64
