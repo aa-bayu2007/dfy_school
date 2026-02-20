@@ -12,10 +12,10 @@ import (
 
 type AttendanceService interface {
 	ScanQR(qrCode string, scannerID uint) (map[string]interface{}, error)
-	GetHistory(studentID string, classID string, date string) ([]models.Attendance, error)
+	GetHistory(studentID string, classID string, date string, scannedBy string) ([]models.Attendance, error)
 	GetStats(classID string, startDate string, endDate string) (map[string]int64, error)
 	GetRecap(classID string, startDate string, endDate string) ([]map[string]interface{}, error)
-	UpdateStatus(id uint, status string, notes string) error
+	UpdateStatus(id uint, status string, notes string, approvedAt *time.Time) error
 }
 
 type attendanceService struct {
@@ -222,8 +222,8 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 	}, nil
 }
 
-func (s *attendanceService) GetHistory(studentID string, classID string, date string) ([]models.Attendance, error) {
-	return s.attendRepo.GetHistory(studentID, classID, date)
+func (s *attendanceService) GetHistory(studentID string, classID string, date string, scannedBy string) ([]models.Attendance, error) {
+	return s.attendRepo.GetHistory(studentID, classID, date, scannedBy)
 }
 
 func (s *attendanceService) GetStats(classID string, startDate string, endDate string) (map[string]int64, error) {
@@ -304,6 +304,6 @@ func (s *attendanceService) GetRecap(classID string, startDate string, endDate s
 	return enrichedResults, nil
 }
 
-func (s *attendanceService) UpdateStatus(id uint, status string, notes string) error {
-	return s.attendRepo.UpdateStatus(id, models.AttendanceStatus(status), notes)
+func (s *attendanceService) UpdateStatus(id uint, status string, notes string, approvedAt *time.Time) error {
+	return s.attendRepo.UpdateStatus(id, models.AttendanceStatus(status), notes, approvedAt)
 }

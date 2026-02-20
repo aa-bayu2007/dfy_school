@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { AppRole, Profile } from '@/types/database';
-import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 
 interface AuthContextType {
@@ -8,7 +7,7 @@ interface AuthContextType {
   profile: Profile | null;
   roles: AppRole[];
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, expectedRole?: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
@@ -64,9 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadSession();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, expectedRole?: string) => {
     try {
-      const data = await apiClient.post<any>('/auth/login', { email, password });
+      const data = await apiClient.post<any>('/auth/login', { email, password, expected_role: expectedRole || '' });
 
       const backendUser = data.user;
       const token = data.token;
@@ -87,10 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(standardizedUser);
       setRoles([mapRole(backendRole)]);
 
-      toast.success('Berhasil masuk!');
+
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.message || 'Gagal masuk');
       throw error;
     }
   };
@@ -98,10 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
       await apiClient.post('/auth/register', { email, password, name: fullName, role: 'murid' });
-      toast.success('Registrasi berhasil! Silakan login.');
+
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast.error(error.message || 'Gagal registrasi');
       throw error;
     }
   };
@@ -112,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setRoles([]);
-    toast.success('Berhasil keluar');
+
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);

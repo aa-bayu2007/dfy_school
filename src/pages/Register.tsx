@@ -30,6 +30,7 @@ export default function Register() {
     try {
       if (signUp) {
         await signUp(email, password, fullName);
+        toast.success('Registrasi berhasil! Silakan login.');
         navigate('/login');
       }
     } catch (error: any) {

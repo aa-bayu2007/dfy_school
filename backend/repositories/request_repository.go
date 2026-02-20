@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"backend/models"
+
 	"gorm.io/gorm"
 )
 
@@ -10,6 +11,7 @@ type RequestRepository interface {
 	GetRequests(studentID string, status string, classID string) ([]models.AttendanceRequest, error)
 	FindByID(id uint) (*models.AttendanceRequest, error)
 	Update(req *models.AttendanceRequest) error
+	FindByStudentAndDate(studentID uint, date string) (*models.AttendanceRequest, error)
 }
 
 type requestRepository struct {
@@ -54,4 +56,13 @@ func (r *requestRepository) FindByID(id uint) (*models.AttendanceRequest, error)
 
 func (r *requestRepository) Update(req *models.AttendanceRequest) error {
 	return r.db.Save(req).Error
+}
+
+func (r *requestRepository) FindByStudentAndDate(studentID uint, date string) (*models.AttendanceRequest, error) {
+	var req models.AttendanceRequest
+	err := r.db.Where("student_id = ? AND DATE(date) = ?", studentID, date).First(&req).Error
+	if err != nil {
+		return nil, err
+	}
+	return &req, nil
 }

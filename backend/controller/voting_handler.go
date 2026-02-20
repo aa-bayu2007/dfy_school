@@ -151,3 +151,20 @@ func (h *VotingHandler) DemoteKetuaKelas(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response.Success(gin.H{"message": "Jabatan Ketua Kelas berhasil dicabut"}))
 }
+
+func (h *VotingHandler) GetVoteLog(c *gin.Context) {
+	sessionIDStr := c.Query("session_id")
+	if sessionIDStr == "" {
+		c.JSON(http.StatusBadRequest, response.Error("session_id diperlukan"))
+		return
+	}
+
+	sessionID, _ := strconv.Atoi(sessionIDStr)
+	votes, err := h.votingService.GetVoteLog(uint(sessionID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(votes))
+}

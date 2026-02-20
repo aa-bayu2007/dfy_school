@@ -14,7 +14,7 @@ import {
 import React, { useState } from 'react';
 import {
   Search,
-  Calendar,
+  Calendar as CalendarIcon,
   CheckCircle,
   XCircle,
   Clock,
@@ -24,63 +24,34 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocation } from 'react-router-dom';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { StatCard } from '@/components/shared/StatCard';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { EmptyState } from '@/components/shared/EmptyState';
 
 export default function RiwayatAbsensi() {
   const { user, profile, roles } = useAuth();
   const location = useLocation();
   const isClassView = location.pathname === '/dashboard/absensi-kelas';
 
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [searchName, setSearchName] = useState<string>('');
 
   const { data: attendances, isLoading } = useAttendance(
     isClassView ? undefined : user?.id,
     isClassView ? (profile?.class_id || undefined) : undefined,
-    selectedDate || undefined
+    selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined
   );
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'hadir':
-        return (
-          <Badge className="bg-success text-success-foreground">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Hadir
-          </Badge>
-        );
-      case 'sakit':
-        return (
-          <Badge variant="secondary">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Sakit
-          </Badge>
-        );
-      case 'izin':
-        return (
-          <Badge className="bg-warning text-warning-foreground">
-            <Clock className="h-3 w-3 mr-1" />
-            Izin
-          </Badge>
-        );
-      case 'alpha':
-        return (
-          <Badge variant="destructive">
-            <XCircle className="h-3 w-3 mr-1" />
-            Alpha
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-    }
-  };
+
 
   // Filter attendances client-side for name search
-  const filteredAttendances = attendances?.filter(att => {
+  const filteredAttendances = attendances?.filter((att: any) => {
     if (!searchName) return true;
     const name = att.student?.full_name || att.student?.name || '';
     return name.toLowerCase().includes(searchName.toLowerCase());
@@ -94,7 +65,7 @@ export default function RiwayatAbsensi() {
     const dayStatusMap = new Map<string, string>();
     const uniqueStudentDays = new Set<string>();
 
-    filteredAttendances.forEach(att => {
+    filteredAttendances.forEach((att: any) => {
       const d = new Date(att.date);
       const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -140,35 +111,42 @@ export default function RiwayatAbsensi() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          {isClassView ? (
-            <Users className="h-6 w-6 text-primary" />
-          ) : (
-            <ClipboardList className="h-6 w-6 text-primary" />
-          )}
-          {isClassView ? 'Absensi Kelas' : 'Riwayat Absensi'}
-        </h1>
-        <p className="text-muted-foreground">
-          {isClassView
-            ? `Daftar kehadiran siswa kelas ${profile?.class?.name || '...'}`
-            : 'Rekap kehadiran Anda'}
-        </p>
-      </div>
+      <PageHeader
+        title={isClassView ? 'Absensi Kelas' : 'Riwayat Absensi'}
+        description={isClassView ? `Daftar kehadiran siswa kelas ${profile?.class?.name || '...'}` : 'Rekap kehadiran Anda'}
+        icon={isClassView ? Users : ClipboardList}
+      />
 
       {/* Filter Section */}
       <div className="flex flex-wrap items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
         {/* Date Filter */}
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-primary" />
+          <CalendarIcon className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">Filter Tanggal:</span>
         </div>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="bg-background border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
-        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              size="sm"
+              className={cn(
+                "w-48 justify-start text-left font-normal bg-background",
+                !selectedDate && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {selectedDate ? format(selectedDate, "PPP", { locale: id }) : <span>Pilih tanggal</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
 
         {/* Name Filter (Only for Class View / Admin / Teachers) */}
         {(isClassView || roles.includes('admin') || roles.includes('guru') || roles.includes('ketua_kelas')) && (
@@ -193,7 +171,7 @@ export default function RiwayatAbsensi() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              setSelectedDate('');
+              setSelectedDate(undefined);
               setSearchName('');
             }}
             className="text-xs h-8 ml-auto"
@@ -205,50 +183,10 @@ export default function RiwayatAbsensi() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Hadir</p>
-                <p className="text-2xl font-bold text-success">{stats?.hadir || 0}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-success/20" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Sakit</p>
-                <p className="text-2xl font-bold">{stats?.sakit || 0}</p>
-              </div>
-              <AlertCircle className="h-8 w-8 text-muted-foreground/20" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Izin</p>
-                <p className="text-2xl font-bold text-warning">{stats?.izin || 0}</p>
-              </div>
-              <Clock className="h-8 w-8 text-warning/20" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Alpha</p>
-                <p className="text-2xl font-bold text-destructive">{stats?.alpha || 0}</p>
-              </div>
-              <XCircle className="h-8 w-8 text-destructive/20" />
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard title="Hadir" value={stats?.hadir || 0} icon={CheckCircle} colorClass="text-success" bgColorClass="bg-success/10" />
+        <StatCard title="Sakit" value={stats?.sakit || 0} icon={AlertCircle} colorClass="text-blue-500" bgColorClass="bg-blue-500/10" />
+        <StatCard title="Izin" value={stats?.izin || 0} icon={Clock} colorClass="text-amber-500" bgColorClass="bg-amber-500/10" />
+        <StatCard title="Alpha" value={stats?.alpha || 0} icon={XCircle} colorClass="text-destructive" bgColorClass="bg-destructive/10" />
       </div>
 
       {/* Attendance Table */}
@@ -281,7 +219,7 @@ export default function RiwayatAbsensi() {
                       if (dateCompare !== 0) return dateCompare;
                       return (a.schedule?.time_slot?.start_time || '').localeCompare(b.schedule?.time_slot?.start_time || '');
                     })
-                    .map((att) => (
+                    .map((att: any) => (
                       <TableRow key={att.id} className="hover:bg-muted/5 transition-colors border-b border-border/40">
                         <TableCell className="py-4 font-bold text-sm text-primary">
                           {new Date(att.date).toLocaleDateString('id-ID', {
@@ -321,9 +259,11 @@ export default function RiwayatAbsensi() {
                             <span className="text-muted-foreground text-xs font-medium italic">Full Day</span>
                           )}
                         </TableCell>
-                        <TableCell className="py-4">{getStatusBadge(att.status)}</TableCell>
                         <TableCell className="py-4">
-                          {att.scanned_at ? (
+                          <StatusBadge status={att.status} />
+                        </TableCell>
+                        <TableCell className="py-4">
+                          {att.status === 'hadir' && att.scanned_at ? (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
                               <Clock className="h-3 w-3 opacity-60" />
                               {new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
@@ -334,13 +274,13 @@ export default function RiwayatAbsensi() {
                         </TableCell>
                         {(isClassView || roles.includes('admin') || roles.includes('guru')) && (
                           <TableCell className="py-4">
-                            {att.scanner ? (
+                            {att.status === 'hadir' && att.scanner ? (
                               <div className="flex items-center gap-1.5">
                                 <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20 text-primary px-1.5 py-0">
                                   {att.scanner.full_name || att.scanner.name || 'Petugas'}
                                 </Badge>
                               </div>
-                            ) : att.notes === "Auto-generated" ? (
+                            ) : att.status === 'hadir' && att.notes === "Auto-generated" ? (
                               <span className="text-[10px] text-muted-foreground italic">Sistem</span>
                             ) : (
                               <span className="text-[10px] text-muted-foreground opacity-40">-</span>
@@ -353,12 +293,11 @@ export default function RiwayatAbsensi() {
               </Table>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Belum ada data kehadiran untuk periode ini
-              </p>
-            </div>
+            <EmptyState
+              title="Belum ada data"
+              description="Belum ada data kehadiran untuk periode ini"
+              icon={ClipboardList}
+            />
           )}
         </CardContent>
       </Card>

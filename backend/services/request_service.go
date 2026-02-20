@@ -14,27 +14,36 @@ type RequestService interface {
 }
 
 type requestService struct {
-	requestRepo repositories.RequestRepository
-	attendRepo  repositories.AttendanceRepository
-	userRepo    repositories.UserRepository
-	masterRepo  repositories.MasterRepository // Added
+	requestRepo  repositories.RequestRepository
+	attendRepo   repositories.AttendanceRepository
+	userRepo     repositories.UserRepository
+	masterRepo   repositories.MasterRepository
+	notifService NotificationService
 }
 
 func NewRequestService(
 	reqRepo repositories.RequestRepository,
 	attRepo repositories.AttendanceRepository,
 	userRepo repositories.UserRepository,
-	masterRepo repositories.MasterRepository, // Added
+	masterRepo repositories.MasterRepository,
+	notifService NotificationService,
 ) RequestService {
 	return &requestService{
-		requestRepo: reqRepo,
-		attendRepo:  attRepo,
-		userRepo:    userRepo,
-		masterRepo:  masterRepo,
+		requestRepo:  reqRepo,
+		attendRepo:   attRepo,
+		userRepo:     userRepo,
+		masterRepo:   masterRepo,
+		notifService: notifService,
 	}
 }
 
 func (s *requestService) Create(studentID uint, date string, reqType string, reason string, attachmentURL string, isFullDay bool, scheduleIDs []uint) error {
+	// Check if already exists for this date
+	existing, _ := s.requestRepo.FindByStudentAndDate(studentID, date)
+	if existing != nil && existing.ID != 0 {
+		return models.ErrDuplicateRequest // We should define this error or return a string error
+	}
+
 	parsedDate, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return err
@@ -57,7 +66,24 @@ func (s *requestService) Create(studentID uint, date string, reqType string, rea
 		}
 	}
 
-	return s.requestRepo.Create(&req)
+	if err := s.requestRepo.Create(&req); err != nil {
+		return err
+	}
+
+	// Notify Wali Kelas
+	go func() {
+		student, _ := s.userRepo.FindByID(studentID)
+		if student != nil && student.ClassID != nil {
+			class, _ := s.masterRepo.FindClassByID(*student.ClassID)
+			if class != nil && class.TeacherID != nil {
+				title := "Pengajuan Izin/Sakit Baru"
+				msg := student.Name + " mengajukan " + reqType + " untuk tanggal " + date
+				s.notifService.NotifyUser(*class.TeacherID, title, msg)
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (s *requestService) GetRequests(studentID string, status string, classID string) ([]models.AttendanceRequest, error) {
@@ -133,7 +159,7 @@ func (s *requestService) ReviewRequest(requestID uint, status string, reviewerID
 
 			if err == nil && existing.ID != 0 {
 				// Update existing
-				s.attendRepo.UpdateStatus(existing.ID, status, req.Reason)
+				s.attendRepo.UpdateStatus(existing.ID, status, req.Reason, req.ReviewedAt)
 			} else {
 				// Create new
 				schedID := schedule.ID
@@ -142,12 +168,24 @@ func (s *requestService) ReviewRequest(requestID uint, status string, reviewerID
 					ScheduleID: &schedID,
 					Date:       req.Date,
 					Status:     status,
+					ApprovedAt: req.ReviewedAt,
 					Notes:      req.Reason,
 				}
 				s.attendRepo.Create(&newAttendance)
 			}
 		}
 	}
+
+	// Notify Student
+	go func() {
+		statusLabel := "Disetujui"
+		if status == "rejected" {
+			statusLabel = "Ditolak"
+		}
+		title := "Status Pengajuan Izin/Sakit"
+		msg := "Permintaan " + req.RequestType + " Anda untuk tanggal " + req.Date.Format("2006-01-02") + " telah " + statusLabel
+		s.notifService.NotifyUser(req.StudentID, title, msg)
+	}()
 
 	return nil
 }

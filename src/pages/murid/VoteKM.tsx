@@ -4,6 +4,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,10 +44,19 @@ import {
     AlertCircle,
     Clock,
     UserMinus,
-    Calendar,
+    Calendar as CalendarIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, differenceInDays, startOfDay, addYears } from "date-fns";
+import { id } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { PageHeader } from '@/components/shared/PageHeader';
+import { StatCard } from '@/components/shared/StatCard';
+import { EmptyState } from '@/components/shared/EmptyState';
 
 interface Candidate {
     id: number;
@@ -65,13 +84,28 @@ interface VotingSession {
     expires_at?: string;
 }
 
+interface VoteLog {
+    id: number;
+    user: {
+        id: number;
+        name: string;
+    };
+    candidate: {
+        student: {
+            name: string;
+        };
+    };
+    CreatedAt: string;
+}
+
 export default function VoteKM() {
     const { user, profile, roles } = useAuth();
     const queryClient = useQueryClient();
     const [selectedCandidateId, setSelectedCandidateId] = useState<string>('');
+    const [pendingVote, setPendingVote] = useState<Candidate | null>(null);
     const [nominatedStudentIds, setNominatedStudentIds] = useState<number[]>([]);
     const [durationMinutes, setDurationMinutes] = useState<number>(60);
-    const [tenureDays, setTenureDays] = useState<number>(365);
+    const [tenureDate, setTenureDate] = useState<Date | undefined>(addYears(new Date(), 1));
     const [timeLeft, setTimeLeft] = useState<string>('');
 
     const isGuru = roles.includes('guru');
@@ -116,15 +150,28 @@ export default function VoteKM() {
         enabled: isGuru && !!classId,
     });
 
+    // Fetch Vote Log (for Guru)
+    const { data: voteLog } = useQuery({
+        queryKey: ['vote-log', activeSession?.id],
+        queryFn: () => apiClient.get<VoteLog[]>(`/voting/vote-log?session_id=${activeSession?.id}`),
+        enabled: isGuru && !!activeSession?.id && activeSession?.status === 'active',
+        refetchInterval: 5000,
+    });
+
     // 3. Mutation: Create Session
     const createSessionMutation = useMutation({
-        mutationFn: (studentIds: number[]) =>
-            apiClient.post('/voting/session', {
+        mutationFn: (studentIds: number[]) => {
+            const days = tenureDate
+                ? differenceInDays(startOfDay(tenureDate), startOfDay(new Date()))
+                : 365;
+
+            return apiClient.post('/voting/session', {
                 class_id: classId,
                 student_ids: studentIds,
                 duration_minutes: durationMinutes,
-                tenure_days: tenureDays
-            }),
+                tenure_days: days
+            });
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['active-voting-session'] });
             toast.success('Sesi voting berhasil dimulai!');
@@ -192,10 +239,11 @@ export default function VoteKM() {
     if (isGuru && !activeSession) {
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl font-bold tracking-tight">Pengaturan Voting Ketua Kelas</h1>
-                    <p className="text-muted-foreground italic text-sm">Pilih kandidat dari siswa di kelas Anda untuk memulai pemilihan.</p>
-                </div>
+                <PageHeader
+                    title="Pengaturan Voting Ketua Kelas"
+                    description="Pilih kandidat dari siswa di kelas Anda untuk memulai pemilihan."
+                    icon={Users}
+                />
 
                 <Card className="border-primary/20 shadow-lg overflow-hidden">
                     <CardHeader className="bg-primary/5 border-b pb-4">
@@ -277,17 +325,33 @@ export default function VoteKM() {
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="tenure">Masa Jabatan (Hari)</Label>
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        id="tenure"
-                                        type="number"
-                                        value={tenureDays}
-                                        onChange={(e) => setTenureDays(parseInt(e.target.value))}
-                                        min={1}
-                                    />
-                                </div>
+                                <Label>Masa Jabatan Hingga</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal h-11",
+                                                !tenureDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {tenureDate ? format(tenureDate, "PPP", { locale: id }) : <span>Pilih tanggal</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={tenureDate}
+                                            onSelect={setTenureDate}
+                                            disabled={(date) => date < new Date()}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                                <p className="text-[10px] text-muted-foreground px-1">
+                                    {tenureDate ? `Sekitar ${differenceInDays(startOfDay(tenureDate), startOfDay(new Date()))} hari masa jabatan` : 'Pilih masa akhir jabatan'}
+                                </p>
                             </div>
                         </div>
 
@@ -319,16 +383,20 @@ export default function VoteKM() {
         return (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-6">
-                    <div className="flex flex-col gap-1">
-                        <h1 className="text-2xl font-bold tracking-tight">Pemilihan Ketua Kelas</h1>
-                        <div className="flex items-center gap-2">
-                            <Badge className="w-fit bg-emerald-500 hover:bg-emerald-600 animate-pulse">Sedang Berlangsung</Badge>
-                            <Badge variant="outline" className="border-primary text-primary flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {timeLeft}
-                            </Badge>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Pemilihan Ketua Kelas"
+                        description="Sesi voting sedang berlangsung di kelas Anda."
+                        icon={Users}
+                        actions={
+                            <div className="flex items-center gap-2">
+                                <Badge className="bg-emerald-500 hover:bg-emerald-600 animate-pulse">Aktif</Badge>
+                                <Badge variant="outline" className="border-primary text-primary flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {timeLeft}
+                                </Badge>
+                            </div>
+                        }
+                    />
 
                     {isStudent && (
                         <Card className="border-primary/20 shadow-xl overflow-hidden bg-primary/5">
@@ -342,7 +410,7 @@ export default function VoteKM() {
                                         key={c.id}
                                         variant="outline"
                                         className="w-full h-14 justify-between bg-background hover:bg-primary hover:text-primary-foreground group transition-all duration-300 border-2"
-                                        onClick={() => castVoteMutation.mutate(c.id)}
+                                        onClick={() => setPendingVote(c)}
                                         disabled={castVoteMutation.isPending}
                                     >
                                         <div className="flex items-center gap-3">
@@ -354,6 +422,32 @@ export default function VoteKM() {
                                         <CheckCircle2 className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </Button>
                                 ))}
+
+                                {/* Confirmation Modal */}
+                                <AlertDialog open={!!pendingVote} onOpenChange={(open) => { if (!open) setPendingVote(null); }}>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Konfirmasi Pilihan</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Apakah Anda yakin ingin memilih <strong>{pendingVote?.student.name}</strong> menjadi Ketua Kelas? Pilihan ini tidak dapat diubah setelah dikonfirmasi.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Batal</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={() => {
+                                                    if (pendingVote) {
+                                                        castVoteMutation.mutate(pendingVote.id);
+                                                        setPendingVote(null);
+                                                    }
+                                                }}
+                                                className="gradient-primary"
+                                            >
+                                                Ya, Pilih
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </CardContent>
                         </Card>
                     )}
@@ -410,6 +504,43 @@ export default function VoteKM() {
                             })}
                         </CardContent>
                     </Card>
+
+                    {/* Vote Log - Guru Only */}
+                    {isGuru && voteLog && voteLog.length > 0 && (
+                        <Card className="shadow-lg border-none bg-card">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                    <UserCheck className="h-5 w-5 text-emerald-500" />
+                                    Log Pemilih ({voteLog.length})
+                                </CardTitle>
+                                <CardDescription>Daftar siswa yang sudah memberikan suara</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-64">
+                                    <div className="space-y-2">
+                                        {voteLog.map((vote) => (
+                                            <div key={vote.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-7 w-7 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
+                                                        {vote.user.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium leading-tight">{vote.user.name}</p>
+                                                        <p className="text-[11px] text-muted-foreground">
+                                                            memilih <span className="font-semibold text-primary">{vote.candidate?.student?.name}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                                    {new Date(vote.CreatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
         );

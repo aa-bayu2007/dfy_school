@@ -3,14 +3,15 @@ import { Attendance, DailyQRCode } from '@/types/database';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 
-export function useAttendance(studentId?: string | number, classId?: string | number, date?: string) {
+export function useAttendance(studentId?: string | number, classId?: string | number, date?: string, scannedBy?: string | number) {
   return useQuery({
-    queryKey: ['attendance', studentId, classId, date],
+    queryKey: ['attendance', studentId, classId, date, scannedBy],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (studentId) params.append('student_id', studentId.toString());
       if (classId) params.append('class_id', classId.toString());
       if (date) params.append('date', date);
+      if (scannedBy) params.append('scanned_by', scannedBy.toString());
 
       const data = await apiClient.get<any[]>(`/attendance/history?${params.toString()}`);
       return data.map(a => ({

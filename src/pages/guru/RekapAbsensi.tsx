@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/table';
 import { ClipboardList, Download, FileSpreadsheet, FileText as FilePdf, CheckCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { EmptyState } from '@/components/shared/EmptyState';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -140,15 +142,11 @@ export default function RekapAbsensi() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ClipboardList className="h-6 w-6 text-primary" />
-          Rekap Absensi
-        </h1>
-        <p className="text-muted-foreground">
-          Lihat dan export rekap kehadiran bulanan
-        </p>
-      </div>
+      <PageHeader
+        title="Rekap Absensi"
+        description="Lihat dan export rekap kehadiran bulanan"
+        icon={ClipboardList}
+      />
 
       {/* Filters */}
       <Card>
@@ -232,12 +230,11 @@ export default function RekapAbsensi() {
         </CardHeader>
         <CardContent>
           {!selectedClass ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Pilih kelas untuk melihat rekap absensi
-              </p>
-            </div>
+            <EmptyState
+              title="Pilih kelas"
+              description="Pilih kelas untuk melihat rekap absensi"
+              icon={ClipboardList}
+            />
           ) : isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -287,12 +284,11 @@ export default function RekapAbsensi() {
               </Table>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Tidak ada data absensi untuk periode ini
-              </p>
-            </div>
+            <EmptyState
+              title="Tidak ada data"
+              description="Tidak ada data absensi untuk periode ini"
+              icon={ClipboardList}
+            />
           )}
         </CardContent>
       </Card>

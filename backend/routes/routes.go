@@ -99,6 +99,7 @@ func SetupRoutes(
 					waliGroup.POST("/session", votingH.CreateSession)
 					waliGroup.POST("/finish/:id", votingH.FinishSession)
 					waliGroup.POST("/demote", votingH.DemoteKetuaKelas)
+					waliGroup.GET("/vote-log", votingH.GetVoteLog)
 					waliGroup.GET("/students", func(c *gin.Context) {
 						// Filter students by class for Wali Kelas
 						u, _ := c.Get("user_id")

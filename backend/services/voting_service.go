@@ -15,6 +15,7 @@ type VotingService interface {
 	FinishSession(sessionID uint) (*models.User, error)
 	GetSessionByID(sessionID uint) (*models.VotingSession, error)
 	DemoteKetuaKelas(classID uint, teacherID uint) error
+	GetVoteLog(sessionID uint) ([]models.Vote, error)
 }
 
 type votingService struct {
@@ -244,4 +245,8 @@ func (s *votingService) DemoteKetuaKelas(classID uint, teacherID uint) error {
 	s.notifService.NotifyUser(teacherID, "Berhasil Mencabut Jabatan", "Jabatan Ketua Kelas "+km.Name+" telah berhasil dicabut.")
 
 	return nil
+}
+
+func (s *votingService) GetVoteLog(sessionID uint) ([]models.Vote, error) {
+	return s.votingRepo.GetVotesBySession(sessionID)
 }

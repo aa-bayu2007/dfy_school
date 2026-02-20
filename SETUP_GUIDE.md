@@ -115,15 +115,10 @@ cd ..
 
 ### 2. Verifikasi File Environment (.env)
 
-File `.env` sudah ada di root project dengan konfigurasi Supabase:
+Pastikan file `.env` di root project memiliki konfigurasi API URL yang benar:
 ```env
-VITE_SUPABASE_PROJECT_ID="gcvhxlkaynfwcqyasygn"
-VITE_SUPABASE_PUBLISHABLE_KEY="..."
-VITE_SUPABASE_URL="https://gcvhxlkaynfwcqyasygn.supabase.co"
+VITE_API_URL=http://localhost:8081/api
 ```
-
-> [!NOTE]
-> File `.env` sudah dikonfigurasi dengan benar, tidak perlu diubah kecuali Anda menggunakan Supabase project yang berbeda.
 
 ### 3. Install Dependencies Node.js
 

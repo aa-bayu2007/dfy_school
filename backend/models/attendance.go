@@ -1,8 +1,14 @@
 package models
 
 import (
-	"gorm.io/gorm"
+	"errors"
 	"time"
+
+	"gorm.io/gorm"
+)
+
+var (
+	ErrDuplicateRequest = errors.New("already submitted a request for this date")
 )
 
 type AttendanceStatus string
@@ -34,7 +40,9 @@ type Attendance struct {
 	Date       time.Time        `json:"date" gorm:"type:date;uniqueIndex:idx_student_schedule_date"`
 	Status     AttendanceStatus `json:"status"`
 	ScannedBy  *uint            `json:"scanned_by"`
+	Scanner    *User            `gorm:"foreignKey:ScannedBy" json:"scanner"`
 	ScannedAt  *time.Time       `json:"scanned_at"`
+	ApprovedAt *time.Time       `json:"approved_at"`
 	Notes      string           `json:"notes"`
 }
 

@@ -6,6 +6,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { QrCode, RefreshCw, CheckCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { cn } from '@/lib/utils';
 
 export default function QRCodePage() {
   const { user } = useAuth();
@@ -34,15 +36,11 @@ export default function QRCodePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <QrCode className="h-6 w-6 text-primary" />
-          QR Code Absensi
-        </h1>
-        <p className="text-muted-foreground">
-          Tunjukkan QR code ini kepada ketua kelas untuk absensi
-        </p>
-      </div>
+      <PageHeader
+        title="QR Code Absensi"
+        description="Tunjukkan QR code ini kepada ketua kelas untuk absensi"
+        icon={QrCode}
+      />
 
       <div className="flex justify-center">
         <Card className="max-w-md w-full shadow-elegant">

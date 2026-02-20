@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRecordAttendance } from '@/hooks/useAttendance';
+import { useRecordAttendance, useAttendance } from '@/hooks/useAttendance';
 import { useSchedulesByDay } from '@/hooks/useSchedules';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,17 +12,47 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ScanLine, Camera, StopCircle, CheckCircle, AlertCircle, RefreshCw, XCircle } from 'lucide-react';
+import { ScanLine, Camera, StopCircle, CheckCircle, AlertCircle, RefreshCw, XCircle, Clock } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { cn } from '@/lib/utils';
 
 export default function ScanAbsensi() {
   const { user, profile } = useAuth();
   const [scanning, setScanning] = useState(false);
-  const [scannedStudents, setScannedStudents] = useState<Array<{ name: string; time: string; status: 'success' | 'error' }>>([]);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const { data: attendances, refetch: refetchHistory } = useAttendance(
+    undefined,
+    undefined,
+    todayStr,
+    user?.id
+  );
+
+  // Derived history from persistent attendance records - sorted latest first
+  const scannedStudents = [...(attendances || [])]
+    .sort((a, b) => new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime())
+    .map(att => {
+      let statusLabel = '';
+      if (att.status === 'hadir') {
+        statusLabel = '(Hadir)';
+      } else if (att.status === 'izin' || att.status === 'sakit') {
+        const timeStr = att.approved_at
+          ? new Date(att.approved_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+          : '';
+        statusLabel = `(${att.status === 'izin' ? 'Izin' : 'Sakit'}${timeStr ? ' pd jam ' + timeStr : ''})`;
+      }
+
+      return {
+        name: `${att.student?.full_name || att.student?.name || 'Siswa'} ${statusLabel}`,
+        time: att.scanned_at ? new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+        status: att.status as 'hadir' | 'sakit' | 'izin' | 'alpha' | 'pending' | 'success' | 'error'
+      };
+    });
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedCodesRef = useRef<Set<string>>(new Set());
@@ -91,15 +121,21 @@ export default function ScanAbsensi() {
       if (scannerRef.current) return; // Already running
 
       try {
-        const scanner = new Html5Qrcode('qr-reader');
+        const scanner = new Html5Qrcode('qr-reader', false);
         scannerRef.current = scanner;
 
         await scanner.start(
           selectedCameraId, // Use specific device ID instead of generic facingMode
           {
-            fps: 15, // Higher FPS for better detection
+            fps: 15,
+            qrbox: { width: 280, height: 280 },
             aspectRatio: 1.0,
-            // qrbox removed to allow full-screen scanning
+            // Try to get a decent resolution if available
+            videoConstraints: {
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
+              facingMode: "environment"
+            }
           },
           async (decodedText) => {
             if (!mounted) return;
@@ -138,14 +174,8 @@ export default function ScanAbsensi() {
               const studentName = result.student_name || "Siswa";
               toast.success(`Berhasil: ${studentName}`);
 
-              setScannedStudents((prev) => [
-                {
-                  name: `${studentName} ${result.is_full_day ? '(Full Masuk)' : '(Hadir)'}`,
-                  time: new Date().toLocaleTimeString('id-ID'),
-                  status: 'success'
-                },
-                ...prev,
-              ]);
+              // Refetch history to show the update
+              refetchHistory();
 
               const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1...');
               audio.play().catch(() => { });
@@ -164,15 +194,6 @@ export default function ScanAbsensi() {
               setScanStatus('error');
               const message = error instanceof Error ? error.message : "Gagal mencatat kehadiran";
               toast.error(message);
-
-              setScannedStudents((prev) => [
-                {
-                  name: `Gagal Scan: ${decodedText.substring(0, 10)}...`,
-                  time: new Date().toLocaleTimeString('id-ID'),
-                  status: 'error'
-                },
-                ...prev,
-              ]);
 
               // Resume scanning after delay
               setTimeout(() => {
@@ -199,22 +220,18 @@ export default function ScanAbsensi() {
     return () => {
       mounted = false;
     };
-  }, [scanning, user?.id, selectedCameraId, recordAttendance]);
+  }, [scanning, selectedCameraId]); // Removed recordAttendance and user?.id to prevent re-render loop
 
   const startScanning = () => setScanning(true);
   const stopScanning = () => setScanning(false);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ScanLine className="h-6 w-6 text-primary" />
-          Scan Absensi
-        </h1>
-        <p className="text-muted-foreground">
-          Scan QR code siswa untuk mencatat kehadiran (Desktop & Mobile Ready)
-        </p>
-      </div>
+      <PageHeader
+        title="Scan Absensi"
+        description="Scan QR code siswa untuk mencatat kehadiran (Desktop & Mobile Ready)"
+        icon={ScanLine}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Scanner Section */}
@@ -235,7 +252,7 @@ export default function ScanAbsensi() {
                 <div className="mt-2">
                   <Select
                     value={selectedCameraId}
-                    onValueChange={(val) => {
+                    onValueChange={(val: string) => {
                       setSelectedCameraId(val);
                       // If scanning, stop first to allow effect to restart with new camera
                       if (scanning) setScanning(false);
@@ -270,6 +287,10 @@ export default function ScanAbsensi() {
                   width: 100% !important;
                   height: 100% !important;
                   overflow: hidden;
+                  border: none !important;
+                }
+                #qr-shaded-region {
+                  border-radius: 0.5rem !important;
                 }
               `}</style>
 
@@ -329,7 +350,7 @@ export default function ScanAbsensi() {
 
             {/* Status Text Info */}
             <div className="text-center h-6">
-              {scanStatus === 'success' && <span className="text-success font-bold animate-pulse">Scan Berhasil!</span>}
+              {scanStatus === 'success' && <span className="text-success font-bold animate-pulse ">Scan Berhasil!</span>}
               {scanStatus === 'error' && <span className="text-destructive font-bold animate-pulse">Gagal Membaca QR / Data Invalid</span>}
               {scanStatus === 'scanning' && <span className="text-muted-foreground text-xs">Pastikan QR Code Terlihat Jelas</span>}
             </div>
@@ -354,17 +375,25 @@ export default function ScanAbsensi() {
                 {scannedStudents.map((student, index) => (
                   <div
                     key={index}
-                    className={`flex items-center justify-between p-3 rounded-lg animate-fade-in ${student.status === 'success' ? 'bg-success/10' : 'bg-destructive/10'}`}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg animate-fade-in transition-all border",
+                      student.status === 'hadir' || student.status === 'success' ? "bg-success/10 border-success/20 text-success" :
+                        student.status === 'izin' ? "bg-amber-500/10 border-amber-500/20 text-amber-500" :
+                          student.status === 'sakit' || student.status === 'error' ? "bg-destructive/10 border-destructive/20 text-destructive" :
+                            "bg-muted border-transparent"
+                    )}
                   >
                     <div className="flex items-center gap-3">
-                      {student.status === 'success' ? (
-                        <CheckCircle className="h-5 w-5 text-success" />
+                      {(student.status === 'hadir' || student.status === 'success') ? (
+                        <CheckCircle className="h-5 w-5" />
+                      ) : student.status === 'izin' ? (
+                        <Clock className="h-5 w-5" />
                       ) : (
-                        <XCircle className="h-5 w-5 text-destructive" />
+                        <XCircle className="h-5 w-5" />
                       )}
-                      <span className={`font-medium ${student.status === 'error' ? 'text-destructive' : ''}`}>{student.name}</span>
+                      <span className="font-bold tracking-tight">{student.name}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">{student.time}</span>
+                    <span className="text-sm font-bold opacity-70 font-mono tracking-tighter">{student.time}</span>
                   </div>
                 ))}
               </div>
