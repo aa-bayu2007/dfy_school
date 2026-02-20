@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, Loader2, User, ShieldCheck, BookOpen } from 'lucide-react';
+import { Loader2, User, ShieldCheck, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -62,7 +62,7 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-elegant animate-fade-in border-none bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full gradient-primary shadow-lg">
-            <GraduationCap className="h-8 w-8 text-white" />
+            <img src="/logo.png" alt="Logo" className="h-10 w-10 object-contain brightness-0 invert" />
           </div>
           <CardTitle className="text-2xl font-bold">DFY School</CardTitle>
           <CardDescription>Sistem Informasi Manajemen Sekolah</CardDescription>
