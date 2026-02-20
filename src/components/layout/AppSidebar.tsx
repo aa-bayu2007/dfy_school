@@ -109,14 +109,18 @@ export default function AppSidebar() {
   return (
     <Sidebar className="border-r border-sidebar-border shadow-sm">
       <SidebarHeader className={`p-4 ${themeClass}`}>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary shadow-sm">
-            <GraduationCap className="h-5 w-5 text-primary-foreground" />
+        <div className="flex items-center gap-3 px-2 py-2">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="Logo"
+              className="h-9 w-auto object-contain brightness-0 invert"
+            />
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-semibold text-sidebar-foreground">Absensi</span>
-              <span className="text-xs text-sidebar-foreground/70">Sistem Sekolah</span>
+              <span className="text-lg font-bold leading-none text-sidebar-foreground tracking-tight">DFY School</span>
+              <span className="text-xs text-sidebar-foreground/100 tracking-wide">System</span>
             </div>
           )}
         </div>

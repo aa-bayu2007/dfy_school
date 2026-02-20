@@ -138,6 +138,77 @@
     --hover-bg: 195 45% 45% / 0.08;
   }
 
+  /* Major Themes (Jurusan) - Light Mode Immersive */
+  .theme-pplg {
+    /* Green */
+    --background: 142 50% 97%;
+    /* Mint White */
+    --card: 0 0% 100%;
+
+    --primary: 142 70% 45%;
+    --accent: 142 70% 35%;
+    --sidebar-background: 145 60% 10%;
+    --sidebar-primary: 142 70% 45%;
+    --sidebar-accent: 145 60% 15%;
+    --hover-bg: 142 70% 45% / 0.1;
+  }
+
+  .theme-tbsm {
+    /* Red */
+    --background: 0 50% 98%;
+    /* Rose White */
+    --card: 0 0% 100%;
+
+    --primary: 0 75% 55%;
+    --accent: 0 75% 45%;
+    --sidebar-background: 0 50% 10%;
+    --sidebar-primary: 0 75% 55%;
+    --sidebar-accent: 0 50% 15%;
+    --hover-bg: 0 75% 55% / 0.1;
+  }
+
+  .theme-dkv {
+    /* Orange */
+    --background: 25 50% 97%;
+    /* Peach White */
+    --card: 0 0% 100%;
+
+    --primary: 25 90% 55%;
+    --accent: 25 90% 45%;
+    --sidebar-background: 25 60% 10%;
+    --sidebar-primary: 25 90% 55%;
+    --sidebar-accent: 25 60% 15%;
+    --hover-bg: 25 90% 55% / 0.1;
+  }
+
+  .theme-tjkt {
+    /* Blue */
+    --background: 215 50% 97%;
+    /* Cloud White */
+    --card: 0 0% 100%;
+
+    --primary: 215 85% 50%;
+    --accent: 215 85% 40%;
+    --sidebar-background: 215 70% 12%;
+    --sidebar-primary: 215 85% 50%;
+    --sidebar-accent: 215 70% 18%;
+    --hover-bg: 215 85% 50% / 0.1;
+  }
+
+  .theme-toi {
+    /* Gray */
+    --background: 220 20% 97%;
+    /* Silver White */
+    --card: 0 0% 100%;
+
+    --primary: 220 15% 50%;
+    --accent: 220 15% 40%;
+    --sidebar-background: 220 20% 14%;
+    --sidebar-primary: 220 15% 50%;
+    --sidebar-accent: 220 20% 20%;
+    --hover-bg: 220 15% 50% / 0.1;
+  }
+
   /* Role Themes - Dark Mode Specific Overrides */
   .dark .role-admin {
     --primary: 240 65% 65%;
@@ -166,6 +237,158 @@
     --hover-bg: 195 60% 60% / 0.12;
   }
 
+  /* Dark Mode Major Overrides - Full Immersive Theme */
+  .dark .theme-pplg {
+    --background: 145 40% 4%;
+    /* Deep Green Black */
+    --foreground: 142 20% 95%;
+
+    --card: 145 30% 8%;
+    /* Dark Green Card */
+    --card-foreground: 142 20% 95%;
+
+    --popover: 145 30% 8%;
+    --popover-foreground: 142 20% 95%;
+
+    --primary: 142 50% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --muted: 145 30% 15%;
+    --muted-foreground: 142 20% 65%;
+
+    --accent: 145 30% 15%;
+    --accent-foreground: 142 20% 95%;
+
+    --border: 145 30% 15%;
+    --input: 145 30% 15%;
+
+    --sidebar-background: 145 40% 6%;
+    --sidebar-foreground: 142 20% 90%;
+    --sidebar-primary: 142 50% 50%;
+    --sidebar-accent: 145 30% 12%;
+    --sidebar-border: 145 30% 12%;
+  }
+
+  .dark .theme-tbsm {
+    --background: 0 30% 5%;
+    /* Deep Red Black */
+    --foreground: 0 20% 95%;
+
+    --card: 0 25% 9%;
+    --card-foreground: 0 20% 95%;
+
+    --popover: 0 25% 9%;
+    --popover-foreground: 0 20% 95%;
+
+    --primary: 0 60% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --muted: 0 25% 15%;
+    --muted-foreground: 0 20% 65%;
+
+    --accent: 0 25% 15%;
+    --accent-foreground: 0 20% 95%;
+
+    --border: 0 25% 15%;
+    --input: 0 25% 15%;
+
+    --sidebar-background: 0 30% 7%;
+    --sidebar-foreground: 0 20% 90%;
+    --sidebar-primary: 0 60% 60%;
+    --sidebar-accent: 0 25% 12%;
+    --sidebar-border: 0 25% 12%;
+  }
+
+  .dark .theme-dkv {
+    --background: 25 35% 5%;
+    /* Deep Orange Black */
+    --foreground: 25 20% 95%;
+
+    --card: 25 30% 9%;
+    --card-foreground: 25 20% 95%;
+
+    --popover: 25 30% 9%;
+    --popover-foreground: 25 20% 95%;
+
+    --primary: 25 70% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --muted: 25 30% 15%;
+    --muted-foreground: 25 20% 65%;
+
+    --accent: 25 30% 15%;
+    --accent-foreground: 25 20% 95%;
+
+    --border: 25 30% 15%;
+    --input: 25 30% 15%;
+
+    --sidebar-background: 25 35% 7%;
+    --sidebar-foreground: 25 20% 90%;
+    --sidebar-primary: 25 70% 60%;
+    --sidebar-accent: 25 30% 12%;
+    --sidebar-border: 25 30% 12%;
+  }
+
+  .dark .theme-tjkt {
+    --background: 215 35% 5%;
+    /* Deep Blue Black */
+    --foreground: 215 20% 95%;
+
+    --card: 215 30% 9%;
+    --card-foreground: 215 20% 95%;
+
+    --popover: 215 30% 9%;
+    --popover-foreground: 215 20% 95%;
+
+    --primary: 215 70% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --muted: 215 30% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 215 30% 15%;
+    --accent-foreground: 215 20% 95%;
+
+    --border: 215 30% 15%;
+    --input: 215 30% 15%;
+
+    --sidebar-background: 215 35% 7%;
+    --sidebar-foreground: 215 20% 90%;
+    --sidebar-primary: 215 70% 60%;
+    --sidebar-accent: 215 30% 12%;
+    --sidebar-border: 215 30% 12%;
+  }
+
+  .dark .theme-toi {
+    --background: 220 20% 5%;
+    /* Deep Gray Black */
+    --foreground: 220 10% 95%;
+
+    --card: 220 15% 10%;
+    --card-foreground: 220 10% 95%;
+
+    --popover: 220 15% 10%;
+    --popover-foreground: 220 10% 95%;
+
+    --primary: 220 15% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --muted: 220 15% 16%;
+    --muted-foreground: 220 10% 65%;
+
+    --accent: 220 15% 16%;
+    --accent-foreground: 220 10% 95%;
+
+    --border: 220 15% 16%;
+    --input: 220 15% 16%;
+
+    --sidebar-background: 220 20% 7%;
+    --sidebar-foreground: 220 10% 90%;
+    --sidebar-primary: 220 15% 60%;
+    --sidebar-accent: 220 15% 13%;
+    --sidebar-border: 220 15% 13%;
+  }
+
   .gradient-primary {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
   }
@@ -192,5 +415,11 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  /* Logo Filter for Dark Mode Visibility */
+  .dark .logo-blend {
+    /* Invert (Lighten Text) + Hue Rotate (Restore Colors) to make dark text visible on dark bg */
+    filter: invert(1) hue-rotate(180deg) brightness(1.5);
   }
 }
