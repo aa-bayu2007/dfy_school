@@ -3,8 +3,8 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
-import KetuaKelasBanner from './KetuaKelasBanner';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import KetuaKelasBanner from './KetuaKelasBanner';
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
