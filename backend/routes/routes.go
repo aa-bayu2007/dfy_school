@@ -44,6 +44,7 @@ func SetupRoutes(
 			protected.GET("/classes", adminH.GetClasses) // Added for guru access with teacher_id filter
 
 			protected.POST("/attendance/scan", attendH.Scan)
+			protected.POST("/attendance/manual", attendH.ManualEntry)
 			protected.GET("/attendance/history", attendH.GetHistory)
 			protected.POST("/attendance/request", reqH.SubmitRequest)
 			protected.GET("/attendance/requests", reqH.GetRequests)
@@ -100,54 +101,92 @@ func SetupRoutes(
 					waliGroup.POST("/finish/:id", votingH.FinishSession)
 					waliGroup.POST("/demote", votingH.DemoteKetuaKelas)
 					waliGroup.GET("/vote-log", votingH.GetVoteLog)
-					waliGroup.GET("/students", func(c *gin.Context) {
-						// Filter students by class for Wali Kelas
-						u, _ := c.Get("user_id")
-						var teacherID uint
-						switch v := u.(type) {
-						case float64:
-							teacherID = uint(v)
-						case uint:
-							teacherID = v
-						}
+				}
 
-						log.Printf("[VotingStudents] TeacherID: %d (Raw type: %T)", teacherID, u)
+				// Shared route for Guru and Ketua Kelas
+				voting.GET("/students", func(c *gin.Context) {
+					// Filter students by class for Wali Kelas OR for Ketua Kelas
+					u, _ := c.Get("user_id")
+					var currentUserID uint
+					switch v := u.(type) {
+					case float64:
+						currentUserID = uint(v)
+					case uint:
+						currentUserID = v
+					}
 
-						// Check if class_id is passed as query param (fallback)
-						queryClassID := c.Query("class_id")
-						var classID uint
-						if queryClassID != "" {
-							parsedID, _ := strconv.ParseUint(queryClassID, 10, 32)
-							classID = uint(parsedID)
-						}
+					// We need to know the role to decide how to fetch students
+					// AuthService is available as authS
+					user, err := authS.GetMe(currentUserID)
+					if err != nil {
+						c.JSON(http.StatusUnauthorized, response.Error("User not found"))
+						return
+					}
 
-						if classID == 0 {
-							// Fetch classes to get class ID from teacher association
-							classes, err := masterS.GetClassesByTeacher(teacherID)
+					log.Printf("[VotingStudents] UserID: %d, Role: %s", currentUserID, user.Role)
+
+					// Allow admin, guru, ketua_kelas
+					if user.Role != "admin" && user.Role != "guru" && user.Role != "teacher" && user.Role != "ketua_kelas" {
+						c.JSON(http.StatusForbidden, response.Error("Unauthorized access"))
+						return
+					}
+
+					// Check if class_id is passed as query param (admin/override)
+					queryClassID := c.Query("class_id")
+					var classID uint
+					if queryClassID != "" {
+						parsedID, _ := strconv.ParseUint(queryClassID, 10, 32)
+						classID = uint(parsedID)
+					}
+
+					if classID == 0 {
+						if user.Role == "guru" || user.Role == "teacher" {
+							// For Guru: Fetch classes to get class ID from teacher association
+							classes, err := masterS.GetClassesByTeacher(currentUserID)
 							if err != nil {
 								log.Printf("[VotingStudents] Error GetClassesByTeacher: %v", err)
 							}
 
-							log.Printf("[VotingStudents] Found %d classes for teacher %d", len(classes), teacherID)
+							log.Printf("[VotingStudents] Found %d classes for teacher %d", len(classes), currentUserID)
 
 							if len(classes) == 0 {
-								c.JSON(http.StatusOK, response.Success([]models.User{}))
+								// Try checking if guru has ClassID directly assigned (some implementations use this)
+								if user.ClassID != nil {
+									classID = *user.ClassID
+								} else {
+									c.JSON(http.StatusOK, response.Success([]models.User{}))
+									return
+								}
+							} else {
+								classID = classes[0].ID
+							}
+						} else if user.Role == "ketua_kelas" {
+							// For Ketua Kelas: Must have ClassID
+							if user.ClassID == nil {
+								c.JSON(http.StatusBadRequest, response.Error("Ketua Kelas has no class assigned"))
 								return
 							}
-							classID = classes[0].ID
+							classID = *user.ClassID
+						} else if user.Role == "admin" {
+							// Admin without query param? Return empty or error?
+							// Let's return error to be specific
+							c.JSON(http.StatusBadRequest, response.Error("class_id required for admin"))
+							return
 						}
+					}
 
-						log.Printf("[VotingStudents] Using ClassID: %d", classID)
+					log.Printf("[VotingStudents] Using ClassID: %d", classID)
 
-						students, err := authS.GetStudentsByClass(classID)
-						if err != nil {
-							log.Printf("[VotingStudents] Error GetStudentsByClass: %v", err)
-						}
-						log.Printf("[VotingStudents] Successfully found %d students for class %d", len(students), classID)
+					students, err := authS.GetStudentsByClass(classID)
+					if err != nil {
+						log.Printf("[VotingStudents] Error GetStudentsByClass: %v", err)
+						c.JSON(http.StatusInternalServerError, response.Error("Failed to fetch students"))
+						return
+					}
+					log.Printf("[VotingStudents] Successfully found %d students for class %d", len(students), classID)
 
-						c.JSON(http.StatusOK, response.Success(students))
-					})
-				}
+					c.JSON(http.StatusOK, response.Success(students))
+				})
 			}
 		}
 	}

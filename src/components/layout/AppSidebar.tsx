@@ -47,6 +47,7 @@ const menuItems = {
     { title: 'Jadwal Pelajaran', url: '/dashboard/jadwal', icon: Calendar },
     { title: 'QR Code Saya', url: '/dashboard/qr-code', icon: QrCode },
     { title: 'Vote KM', url: '/dashboard/vote-km', icon: UserCheck },
+    { title: 'Konfirmasi Kehadiran', url: '/attendance/confirmation', icon: UserCheck },
     { title: 'Absensi Kelas', url: '/dashboard/absensi-kelas', icon: ClipboardList },
     { title: 'Ajukan Izin', url: '/dashboard/izin', icon: FileText },
   ],

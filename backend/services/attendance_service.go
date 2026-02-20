@@ -16,6 +16,7 @@ type AttendanceService interface {
 	GetStats(classID string, startDate string, endDate string) (map[string]int64, error)
 	GetRecap(classID string, startDate string, endDate string) ([]map[string]interface{}, error)
 	UpdateStatus(id uint, status string, notes string, approvedAt *time.Time) error
+	ManualEntry(studentID uint, scannerID uint) (map[string]interface{}, error)
 }
 
 type attendanceService struct {
@@ -355,4 +356,124 @@ func (s *attendanceService) GetRecap(classID string, startDate string, endDate s
 
 func (s *attendanceService) UpdateStatus(id uint, status string, notes string, approvedAt *time.Time) error {
 	return s.attendRepo.UpdateStatus(id, models.AttendanceStatus(status), notes, approvedAt)
+}
+
+func (s *attendanceService) ManualEntry(studentID uint, scannerID uint) (map[string]interface{}, error) {
+	// 1. Retrieve Student
+	student, err := s.userRepo.FindByID(studentID)
+	if err != nil {
+		return nil, errors.New("Siswa tidak ditemukan")
+	}
+
+	// 2. Validate Scanner Permissions
+	scanner, err := s.userRepo.FindByID(scannerID)
+	if err != nil {
+		return nil, errors.New("Scanner tidak ditemukan")
+	}
+
+	// Security check: Scanner can only scan students from their own class or assigned class
+	if scanner.Role == "admin" {
+		// Admin can scan anyone
+	} else if scanner.Role == "guru" || scanner.Role == "teacher" {
+		// Guru checks
+		if student.ClassID == nil {
+			return nil, errors.New("Siswa tidak memiliki kelas")
+		}
+		// Check if Wali Kelas (simplified check, ideal is strict class ownership)
+		// For now, allow Guru to manual entry if they are teachers? Or strict check?
+		// Let's stick to ScanQR strictness: Must be Wali Kelas
+		if student.Class != nil {
+			if student.Class.TeacherID == nil || *student.Class.TeacherID != scanner.ID {
+				return nil, errors.New("Anda bukan Wali Kelas dari siswa ini")
+			}
+		} else {
+			class, err := s.masterRepo.FindClassByID(*student.ClassID)
+			if err != nil {
+				return nil, errors.New("Kelas siswa tidak ditemukan")
+			}
+			if class.TeacherID == nil || *class.TeacherID != scanner.ID {
+				return nil, errors.New("Anda bukan Wali Kelas dari siswa ini")
+			}
+		}
+	} else if scanner.Role == "ketua_kelas" {
+		// KM Check
+		if scanner.ClassID == nil || student.ClassID == nil || *scanner.ClassID != *student.ClassID {
+			return nil, errors.New("Anda hanya bisa mengabsen teman sekelas")
+		}
+	} else {
+		return nil, errors.New("Anda tidak memiliki izin untuk melakukan input manual")
+	}
+
+	// 3. Get Schedules
+	now := time.Now()
+	dayID := int(now.Weekday())
+	if dayID == 0 {
+		dayID = 7
+	}
+
+	classIDStr := fmt.Sprintf("%d", *student.ClassID)
+	schedules, err := s.masterRepo.GetSchedules(classIDStr, "", dayID)
+	if err != nil || len(schedules) == 0 {
+		return nil, errors.New("Tidak ada jadwal untuk hari ini")
+	}
+
+	// 4. Update Attendance
+	updatedCount := 0
+	createdCount := 0
+
+	for _, schedule := range schedules {
+		// Time Logic:
+		// User requirement: "sisakan log waktu saat di izin dan update hanya di sesi yang sedang berjalan"
+		// This means we should NOT update PAST schedules.
+		// We only update CURRENT and FUTURE schedules.
+
+		// Parse EndTime "HH:MM"
+		endTimeStr := schedule.TimeSlot.EndTime
+		if endTimeStr != "" {
+			// Construct full date string for today + HH:MM
+			timeLayout := "2006-01-02 15:04"
+			fullEndTimeStr := fmt.Sprintf("%s %s", now.Format("2006-01-02"), endTimeStr)
+			endTime, errParse := time.ParseInLocation(timeLayout, fullEndTimeStr, time.Local)
+
+			if errParse == nil {
+				// If current time is strictly AFTER end time, it's a past schedule.
+				// We skip it to preserve whatever status it has (Izin/Alpha/Hadir).
+				if now.After(endTime) {
+					continue
+				}
+			}
+		}
+
+		// Check existing
+		existing, err := s.attendRepo.FindByStudentAndSchedule(uint(studentID), schedule.ID, now.Format("2006-01-02"))
+		if err == nil && existing.ID != 0 {
+			// Update to Hadir if not Hadir
+			if existing.Status != models.StatusHadir {
+				s.attendRepo.UpdateStatus(existing.ID, models.StatusHadir, "Manual Entry (Return to Class)", &now)
+				updatedCount++
+			}
+		} else {
+			// Create new Headir
+			attendance := models.Attendance{
+				StudentID:  uint(studentID),
+				ClassID:    *student.ClassID,
+				ScheduleID: &schedule.ID,
+				Date:       now,
+				Status:     models.StatusHadir,
+				ScannedBy:  &scannerID,
+				ScannedAt:  &now,
+				Notes:      "Manual Entry",
+			}
+			if err := s.attendRepo.Create(&attendance); err == nil {
+				createdCount++
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"student_name":  student.Name,
+		"updated_count": updatedCount,
+		"created_count": createdCount,
+		"message":       fmt.Sprintf("Berhasil update status %s menjadi Hadir", student.Name),
+	}, nil
 }

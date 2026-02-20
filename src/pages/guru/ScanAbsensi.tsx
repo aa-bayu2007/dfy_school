@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRecordAttendance, useAttendance } from '@/hooks/useAttendance';
+import { useRecordAttendance, useAttendance, useManualAttendance } from '@/hooks/useAttendance';
+import { useStudents } from '@/hooks/useStudents';
 import { useSchedulesByDay } from '@/hooks/useSchedules';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,12 @@ export default function ScanAbsensi() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmData, setConfirmData] = useState<{ studentName: string; decodedText: string } | null>(null);
 
+  // Manual Entry State
+  const [manualOpen, setManualOpen] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const { data: students } = useStudents(profile?.class_id);
+  const manualAttendance = useManualAttendance();
+
   const todayStr = new Date().toISOString().split('T')[0];
   const { data: attendances, refetch: refetchHistory } = useAttendance(
     undefined,
@@ -46,9 +53,22 @@ export default function ScanAbsensi() {
   );
 
   // Derived history from persistent attendance records - sorted latest first
-  const scannedStudents = [...(attendances || [])]
-    .sort((a, b) => new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime())
-    .map(att => {
+  // Deduplicate by student ID (or name if ID missing), keeping the LATEST record
+  const scannedStudents = (() => {
+    if (!attendances) return [];
+
+    const uniqueMap = new Map();
+    // Sort by scanned_at descending first to ensure we process latest first
+    const sorted = [...attendances].sort((a, b) => new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime());
+
+    sorted.forEach(att => {
+      const key = att.student?.id || att.student?.full_name || att.student_id; // Prefer ID
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, att);
+      }
+    });
+
+    return Array.from(uniqueMap.values()).map(att => {
       let statusLabel = '';
       if (att.status === 'hadir') {
         statusLabel = '(Hadir)';
@@ -65,6 +85,7 @@ export default function ScanAbsensi() {
         status: att.status as 'hadir' | 'sakit' | 'izin' | 'alpha' | 'pending' | 'success' | 'error'
       };
     });
+  })();
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedCodesRef = useRef<Set<string>>(new Set());
@@ -287,6 +308,22 @@ export default function ScanAbsensi() {
     if (scannerRef.current) scannerRef.current.resume();
   };
 
+  const handleManualSubmit = async () => {
+    if (!selectedStudentId) {
+      toast.error("Pilih siswa terlebih dahulu");
+      return;
+    }
+
+    try {
+      await manualAttendance.mutateAsync({ studentId: Number(selectedStudentId) });
+      setManualOpen(false);
+      setSelectedStudentId('');
+      refetchHistory();
+    } catch (error) {
+      console.error("Manual entry error", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -388,16 +425,29 @@ export default function ScanAbsensi() {
               )}
             </div>
 
+            {/* Manual Input Dialog */}
             <div className="flex gap-2">
               {!scanning ? (
-                <Button
-                  onClick={startScanning}
-                  className="flex-1 gradient-primary h-12 text-lg shadow-lg"
-                  disabled={!selectedCameraId}
-                >
-                  <Camera className="h-5 w-5 mr-2" />
-                  {selectedCameraId ? 'Mulai Scan' : 'Mendeteksi Kamera...'}
-                </Button>
+                <>
+                  <Button
+                    onClick={startScanning}
+                    className="flex-1 gradient-primary h-12 text-lg shadow-lg"
+                    disabled={!selectedCameraId}
+                  >
+                    <Camera className="h-5 w-5 mr-2" />
+                    {selectedCameraId ? 'Mulai Scan' : 'Mendeteksi Kamera...'}
+                  </Button>
+                  {/* Manual Input - Only for Wali Kelas / Guru */}
+                  {(user?.role === 'guru' || user?.role === 'teacher' || user?.role === 'admin') && (
+                    <Button
+                      variant="outline"
+                      className="h-12 px-4 border-2 border-primary/20 text-primary hover:bg-primary/5"
+                      onClick={() => setManualOpen(true)}
+                    >
+                      Input Manual
+                    </Button>
+                  )}
+                </>
               ) : (
                 <Button
                   onClick={stopScanning}
@@ -409,6 +459,38 @@ export default function ScanAbsensi() {
                 </Button>
               )}
             </div>
+
+            <AlertDialog open={manualOpen} onOpenChange={setManualOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Input Absensi Manual</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Pilih siswa yang ingin dicatat kehadirannya secara manual (misal: kembali ke kelas).
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-4">
+                  <label className="text-sm font-medium mb-2 block">Pilih Siswa</label>
+                  <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Cari nama siswa..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {students?.map(s => (
+                        <SelectItem key={s.id} value={s.id.toString()}>
+                          {s.full_name || s.name} ({s.nis || '-'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setManualOpen(false)}>Batal</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleManualSubmit} disabled={manualAttendance.isPending}>
+                    {manualAttendance.isPending ? 'Menyimpan...' : 'Simpan Kehadiran'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Status Text Info */}
             <div className="text-center h-6">

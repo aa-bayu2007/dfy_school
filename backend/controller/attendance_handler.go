@@ -138,3 +138,32 @@ func (h *AttendanceHandler) UpdateStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response.Success(nil))
 }
+
+func (h *AttendanceHandler) ManualEntry(c *gin.Context) {
+	// Get user_id from AuthMiddleware context
+	rawUserID, _ := c.Get("user_id")
+	var scannerID uint
+	switch v := rawUserID.(type) {
+	case float64:
+		scannerID = uint(v)
+	case uint:
+		scannerID = v
+	}
+
+	var input struct {
+		StudentID uint `json:"student_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("Invalid input"))
+		return
+	}
+
+	result, err := h.attendService.ManualEntry(input.StudentID, scannerID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(result))
+}

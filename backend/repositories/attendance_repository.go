@@ -119,7 +119,7 @@ func (r *attendanceRepository) GetMonthlyRecap(classID string, startDate string,
 
 	rows, err := r.db.Table("attendances").
 		Select(`
-			student_id,
+			attendances.student_id,
 			COUNT(DISTINCT CASE WHEN daily_status = 'hadir' THEN date_only END) as hadir,
 			COUNT(DISTINCT CASE WHEN daily_status = 'sakit' THEN date_only END) as sakit,
 			COUNT(DISTINCT CASE WHEN daily_status = 'izin' THEN date_only END) as izin,

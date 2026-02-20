@@ -160,3 +160,34 @@ export function useAttendanceRecap(classId?: string, month?: number, year?: numb
     enabled: !!classId,
   });
 }
+
+export function useManualAttendance() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      studentId,
+    }: {
+      studentId: number;
+    }) => {
+      return apiClient.post<{
+        student_name: string;
+        updated_count: number;
+        created_count: number;
+        message: string;
+      }>('/attendance/manual', {
+        student_id: studentId,
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-recap'] });
+
+      toast.success(data.message);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}

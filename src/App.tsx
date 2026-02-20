@@ -25,6 +25,7 @@ import Profile from "./pages/Profile";
 import VoteKM from "./pages/murid/VoteKM";
 import DaftarSiswa from "./pages/guru/DaftarSiswa";
 import NotFound from "./pages/NotFound";
+import KonfirmasiKehadiran from "./pages/siswa/KonfirmasiKehadiran";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,12 @@ const App = () => (
                   <Route path="/dashboard/kelola-jadwal" element={<KelolaJadwal />} />
                   <Route path="/dashboard/vote-km" element={<VoteKM />} />
                   <Route path="/dashboard/daftar-siswa" element={<DaftarSiswa />} />
+
+                  {/* Ketua Kelas Routes */}
+                  <Route element={<ProtectedRoute allowedRoles={['ketua_kelas', 'admin', 'guru']} />}>
+                    <Route path="/attendance/confirmation" element={<KonfirmasiKehadiran />} />
+                  </Route>
+
                 </Route>
               </Route>
 
