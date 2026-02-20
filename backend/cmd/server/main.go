@@ -37,6 +37,14 @@ func main() {
 		&models.Vote{},
 	)
 
+	// Check if seeding is needed (e.g., if no roles exist)
+	var roleCount int64
+	db.Model(&models.Role{}).Count(&roleCount)
+	if roleCount == 0 {
+		log.Println("Database appears empty. Seeding initial data...")
+		config.SeedData()
+	}
+
 	// Repositories
 	userRepo := repositories.NewUserRepository(db)
 	masterRepo := repositories.NewMasterRepository(db)
