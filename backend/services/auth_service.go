@@ -78,22 +78,29 @@ func (s *authService) Login(identifier, password, expectedRole string) (string, 
 
 	// Validate role matches expected login form
 	if expectedRole != "" {
-		actualRole := user.Role
+		actualRole := strings.ToLower(user.Role)
 		if actualRole == "" {
 			actualRole = "murid"
 		}
+
+		expectedRole = strings.ToLower(expectedRole)
 		roleAllowed := false
+
 		switch expectedRole {
-		case "murid":
-			roleAllowed = actualRole == "murid" || actualRole == "student" || actualRole == "ketua_kelas"
-		case "guru":
-			roleAllowed = actualRole == "guru" || actualRole == "teacher"
+		case "murid", "siswa", "student":
+			roleAllowed = (actualRole == "murid" || actualRole == "student" || actualRole == "ketua_kelas")
+		case "guru", "teacher":
+			roleAllowed = (actualRole == "guru" || actualRole == "teacher")
 		case "admin":
-			roleAllowed = actualRole == "admin"
+			roleAllowed = (actualRole == "admin")
+		default:
+			// If an unknown expectedRole is passed, we default to deny for safety
+			roleAllowed = false
 		}
+
 		if !roleAllowed {
 			log.Printf("[Login] Role mismatch: expected=%s, actual=%s for user %s", expectedRole, actualRole, identifier)
-			return "", "", nil, errors.New("akun ini tidak terdaftar untuk login di form ini")
+			return "", "", nil, errors.New("akun ini tidak memiliki akses untuk login di form ini")
 		}
 	}
 

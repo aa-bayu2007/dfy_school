@@ -19,13 +19,15 @@ func NewRequestHandler(reqService services.RequestService) *RequestHandler {
 
 func (h *RequestHandler) SubmitRequest(c *gin.Context) {
 	var input struct {
-		StudentID     uint   `json:"student_id" binding:"required"`
-		Date          string `json:"date" binding:"required"`
-		RequestType   string `json:"request_type" binding:"required"`
-		Reason        string `json:"reason" binding:"required"`
-		AttachmentURL string `json:"attachment_url"`
-		IsFullDay     *bool  `json:"is_full_day"`
-		ScheduleIDs   []uint `json:"schedule_ids"`
+		StudentID        uint   `json:"student_id" binding:"required"`
+		Date             string `json:"date" binding:"required"`
+		EndDate          string `json:"end_date"`
+		AutoMarkUpcoming bool   `json:"auto_mark_upcoming"`
+		RequestType      string `json:"request_type" binding:"required"`
+		Reason           string `json:"reason" binding:"required"`
+		AttachmentURL    string `json:"attachment_url"`
+		IsFullDay        *bool  `json:"is_full_day"`
+		ScheduleIDs      []uint `json:"schedule_ids"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -39,7 +41,7 @@ func (h *RequestHandler) SubmitRequest(c *gin.Context) {
 		isFullDay = *input.IsFullDay
 	}
 
-	if err := h.reqService.Create(input.StudentID, input.Date, input.RequestType, input.Reason, input.AttachmentURL, isFullDay, input.ScheduleIDs); err != nil {
+	if err := h.reqService.Create(input.StudentID, input.Date, input.EndDate, input.RequestType, input.Reason, input.AttachmentURL, isFullDay, input.AutoMarkUpcoming, input.ScheduleIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}

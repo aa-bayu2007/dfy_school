@@ -12,6 +12,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScanLine, Camera, StopCircle, CheckCircle, AlertCircle, RefreshCw, XCircle, Clock } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { toast } from 'sonner';
@@ -24,6 +34,8 @@ export default function ScanAbsensi() {
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<{ studentName: string; decodedText: string } | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const { data: attendances, refetch: refetchHistory } = useAttendance(
@@ -167,6 +179,13 @@ export default function ScanAbsensi() {
                 scannerId: user?.id || '',
               });
 
+              if (result.confirmation_required) {
+                setConfirmData({ studentName: result.student_name, decodedText });
+                setConfirmOpen(true);
+                setScanStatus('idle'); // Pause state visualization
+                return;
+              }
+
               // SUCCESS FEEDBACK
               setScanStatus('success');
               scannedCodesRef.current.add(decodedText); // Add to session cache
@@ -224,6 +243,49 @@ export default function ScanAbsensi() {
 
   const startScanning = () => setScanning(true);
   const stopScanning = () => setScanning(false);
+
+  const handleConfirmReturn = async () => {
+    if (!confirmData) return;
+    try {
+      setScanStatus('scanning');
+      const result = await recordAttendance.mutateAsync({
+        qrCode: confirmData.decodedText,
+        scannerId: user?.id || '',
+        force: true
+      });
+
+      setScanStatus('success');
+      scannedCodesRef.current.add(confirmData.decodedText);
+      toast.success(`Berhasil override: ${result.student_name}`);
+      refetchHistory();
+
+      // Resume scanning
+      setTimeout(() => {
+        setScanStatus('scanning');
+        if (scannerRef.current) scannerRef.current.resume();
+      }, 1500);
+
+    } catch (error) {
+      setScanStatus('error');
+      toast.error("Gagal override status");
+
+      // Resume scanning
+      setTimeout(() => {
+        setScanStatus('scanning');
+        if (scannerRef.current) scannerRef.current.resume();
+      }, 1500);
+    } finally {
+      setConfirmOpen(false);
+      setConfirmData(null);
+    }
+  };
+
+  const handleCancelConfirm = () => {
+    setConfirmOpen(false);
+    setConfirmData(null);
+    setScanStatus('scanning');
+    if (scannerRef.current) scannerRef.current.resume();
+  };
 
   return (
     <div className="space-y-6">
@@ -408,6 +470,24 @@ export default function ScanAbsensi() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Kehadiran Kembali</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmData?.studentName} sedang dalam status Izin/Sakit. Apakah Anda yakin siswa ini sudah kembali masuk ke kelas?
+              Status kehadirannya akan diubah menjadi Hadir untuk sisa hari ini.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelConfirm}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReturn} className="gradient-primary">
+              Ya, Siswa Masuk
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

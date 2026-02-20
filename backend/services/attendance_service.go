@@ -11,7 +11,7 @@ import (
 )
 
 type AttendanceService interface {
-	ScanQR(qrCode string, scannerID uint) (map[string]interface{}, error)
+	ScanQR(qrCode string, scannerID uint, force bool) (map[string]interface{}, error)
 	GetHistory(studentID string, classID string, date string, scannedBy string) ([]models.Attendance, error)
 	GetStats(classID string, startDate string, endDate string) (map[string]int64, error)
 	GetRecap(classID string, startDate string, endDate string) ([]map[string]interface{}, error)
@@ -32,7 +32,7 @@ func NewAttendanceService(
 	return &attendanceService{attendRepo, userRepo, masterRepo}
 }
 
-func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]interface{}, error) {
+func (s *attendanceService) ScanQR(qrCode string, scannerID uint, force bool) (map[string]interface{}, error) {
 	// Parse QR: "STU-{id}|{name}|{nis}|{class_name}|{date}|{timestamp}"
 	// Expected parts: 6
 	parts := strings.Split(qrCode, "|")
@@ -94,9 +94,10 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 	// Security check: Scanner can only scan students from their own class or assigned class
 	scanner, err := s.userRepo.FindByID(scannerID)
 	if err == nil && scanner != nil {
-		if scanner.Role == "admin" {
+		switch scanner.Role {
+		case "admin":
 			// Admin can scan anyone, no restriction
-		} else if scanner.Role == "teacher" || scanner.Role == "guru" {
+		case "teacher", "guru":
 			// Guru can ONLY scan if they are the Homeroom Teacher (Wali Kelas) of the student's class
 			if student.ClassID == nil {
 				return nil, errors.New("Siswa tidak memiliki kelas, tidak bisa discan oleh Guru")
@@ -114,11 +115,10 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 					return nil, errors.New("Kelas siswa tidak ditemukan")
 				}
 				if class.TeacherID == nil || *class.TeacherID != scanner.ID {
-					// Debug info if needed: fmt.Sprintf("Class TID: %v, Scanner ID: %v", class.TeacherID, scanner.ID)
 					return nil, errors.New("Anda bukan Wali Kelas dari siswa ini")
 				}
 			}
-		} else if scanner.Role == "ketua_kelas" {
+		case "ketua_kelas":
 			// Ketua Kelas can ONLY scan students in their OWN class
 			if scanner.ClassID == nil {
 				return nil, errors.New("Anda (Ketua Kelas) tidak memiliki kelas assignments")
@@ -131,7 +131,7 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 			if *scanner.ClassID != *student.ClassID {
 				return nil, errors.New("Siswa bukan dari kelas Anda")
 			}
-		} else {
+		default:
 			// Others (Murid scanning themselves?)
 			// If Murid scans themselves?
 			// Check if scanner.ID == student.ID
@@ -168,12 +168,60 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 		return nil, errors.New("No schedules found for today")
 	}
 
+	// Get student's attendance records for TODAY to check for existing status
+	existingAttendances, _ := s.attendRepo.GetHistory(studentIDStr, "", today, "")
+
+	hasBeenPresentToday := false
+	isOnLeaveNow := false
+	var existingLeaveIDs []uint
+
+	for _, att := range existingAttendances {
+		if att.Status == models.StatusHadir {
+			hasBeenPresentToday = true
+		}
+		if att.Status == models.StatusIzin || att.Status == models.StatusSakit {
+			isOnLeaveNow = true
+			existingLeaveIDs = append(existingLeaveIDs, att.ID)
+		}
+	}
+
+	// Logic: If student ALREADY has Izin/Sakit records but also HAD 'Hadir' before today,
+	// it means they left mid-day and are now RETURNING.
+	if isOnLeaveNow && hasBeenPresentToday && !force {
+		return map[string]interface{}{
+			"student_name":          student.Name,
+			"confirmation_required": true,
+			"message":               fmt.Sprintf("%s sedang dalam status Izin/Sakit. Apakah dia sudah kembali masuk kelas?", student.Name),
+		}, nil
+	}
+
 	createdCount := 0
+	updatedCount := 0
+
+	// If force is true, we override all Izin/Sakit records for today with Hadir
+	if force && isOnLeaveNow {
+		for _, attID := range existingLeaveIDs {
+			s.attendRepo.UpdateStatus(attID, models.StatusHadir, "Override by scanned (returned from leave)", &now)
+			updatedCount++
+		}
+	}
+
 	for _, schedule := range schedules {
 		// Check existing
-		_, err := s.attendRepo.FindByStudentAndSchedule(uint(studentID), schedule.ID, today)
-		if err == nil {
-			continue // Already exists
+		existing, err := s.attendRepo.FindByStudentAndSchedule(uint(studentID), schedule.ID, today)
+		if err == nil && existing.ID != 0 {
+			// If it's already Hadir, skip
+			if existing.Status == models.StatusHadir {
+				continue
+			}
+
+			// If we are forcing, we already updated it above if it was Izin/Sakit.
+			// But for safety or for ANY non-hadir status:
+			if force {
+				s.attendRepo.UpdateStatus(existing.ID, models.StatusHadir, "Override by scanned", &now)
+				updatedCount++
+			}
+			continue
 		}
 
 		attendance := models.Attendance{
@@ -216,8 +264,9 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint) (map[string]in
 
 	return map[string]interface{}{
 		"student_name":    student.Name,
-		"is_full_day":     createdCount == len(schedules),
+		"is_full_day":     createdCount+updatedCount == len(schedules),
 		"created_count":   createdCount,
+		"updated_count":   updatedCount,
 		"total_schedules": len(schedules),
 	}, nil
 }

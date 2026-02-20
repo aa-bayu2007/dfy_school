@@ -45,6 +45,8 @@ export function useCreateAttendanceRequest() {
     mutationFn: async ({
       studentId,
       date,
+      endDate,
+      autoMarkUpcoming,
       requestType,
       reason,
       attachmentUrl,
@@ -53,6 +55,8 @@ export function useCreateAttendanceRequest() {
     }: {
       studentId: string;
       date: string;
+      endDate?: string;
+      autoMarkUpcoming?: boolean;
       requestType: 'sakit' | 'izin';
       reason: string;
       attachmentUrl?: string;
@@ -63,6 +67,8 @@ export function useCreateAttendanceRequest() {
       return apiClient.post<any>('/attendance/request', {
         student_id: Number(studentId),
         date,
+        end_date: endDate,
+        auto_mark_upcoming: autoMarkUpcoming,
         request_type: requestType,
         reason,
         attachment_url: attachmentUrl || "",

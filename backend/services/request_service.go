@@ -8,7 +8,7 @@ import (
 )
 
 type RequestService interface {
-	Create(studentID uint, date string, reqType string, reason string, attachmentURL string, isFullDay bool, scheduleIDs []uint) error
+	Create(studentID uint, date string, endDate string, reqType string, reason string, attachmentURL string, isFullDay bool, autoMarkUpcoming bool, scheduleIDs []uint) error
 	GetRequests(studentID string, status string, classID string) ([]models.AttendanceRequest, error)
 	ReviewRequest(requestID uint, status string, reviewerID uint) error
 }
@@ -37,11 +37,11 @@ func NewRequestService(
 	}
 }
 
-func (s *requestService) Create(studentID uint, date string, reqType string, reason string, attachmentURL string, isFullDay bool, scheduleIDs []uint) error {
+func (s *requestService) Create(studentID uint, date string, endDate string, reqType string, reason string, attachmentURL string, isFullDay bool, autoMarkUpcoming bool, scheduleIDs []uint) error {
 	// Check if already exists for this date
 	existing, _ := s.requestRepo.FindByStudentAndDate(studentID, date)
 	if existing != nil && existing.ID != 0 {
-		return models.ErrDuplicateRequest // We should define this error or return a string error
+		return models.ErrDuplicateRequest
 	}
 
 	parsedDate, err := time.Parse("2006-01-02", date)
@@ -49,15 +49,25 @@ func (s *requestService) Create(studentID uint, date string, reqType string, rea
 		return err
 	}
 
+	var parsedEndDate *time.Time
+	if endDate != "" {
+		ed, err := time.Parse("2006-01-02", endDate)
+		if err == nil {
+			parsedEndDate = &ed
+		}
+	}
+
 	req := models.AttendanceRequest{
-		StudentID:     studentID,
-		Date:          parsedDate,
-		RequestType:   reqType,
-		Reason:        reason,
-		AttachmentURL: attachmentURL,
-		IsFullDay:     isFullDay,
-		Schedules:     []models.Schedule{},
-		Status:        models.RequestPending,
+		StudentID:        studentID,
+		Date:             parsedDate,
+		EndDate:          parsedEndDate,
+		RequestType:      reqType,
+		Reason:           reason,
+		AttachmentURL:    attachmentURL,
+		IsFullDay:        isFullDay,
+		AutoMarkUpcoming: autoMarkUpcoming,
+		Schedules:        []models.Schedule{},
+		Status:           models.RequestPending,
 	}
 
 	if !isFullDay {
@@ -77,7 +87,11 @@ func (s *requestService) Create(studentID uint, date string, reqType string, rea
 			class, _ := s.masterRepo.FindClassByID(*student.ClassID)
 			if class != nil && class.TeacherID != nil {
 				title := "Pengajuan Izin/Sakit Baru"
-				msg := student.Name + " mengajukan " + reqType + " untuk tanggal " + date
+				dateStr := date
+				if endDate != "" && endDate != date {
+					dateStr = date + " s/d " + endDate
+				}
+				msg := student.Name + " mengajukan " + reqType + " untuk tanggal " + dateStr
 				s.notifService.NotifyUser(*class.TeacherID, title, msg)
 			}
 		}
@@ -106,72 +120,113 @@ func (s *requestService) ReviewRequest(requestID uint, status string, reviewerID
 	}
 
 	// If approved, create Attendance record or "Cut" existing one
-	// If approved, create Attendance record for ALL schedules on that day
 	if status == "approved" {
-		// 1. Get Student Class ID
 		user, err := s.userRepo.FindByID(req.StudentID)
 		if err != nil {
 			return err
 		}
 		if user.ClassID == nil {
-			return nil // No class, no schedule to update
+			return nil
 		}
 
-		// 2. Get Day ID (Monday=1, Sunday=7)
-		// time.Weekday returns Sunday=0, Monday=1...
-		weekday := req.Date.Weekday()
-		dayID := int(weekday)
-		if dayID == 0 {
-			dayID = 7
-		} // Adjust Sunday 0 -> 7 if DB uses 1-7 (Senin-Minggu)
-
-		// 3. Get Schedules for Class & Day
-		schedules, err := s.masterRepo.GetSchedules(strconv.Itoa(int(*user.ClassID)), "", dayID)
-		if err != nil {
-			return err
+		// Calculate start and end range
+		startDate := req.Date
+		endDate := req.Date
+		if req.EndDate != nil {
+			endDate = *req.EndDate
 		}
 
-		// 4. Create/Update Attendance for each schedule
-		reqDateStr := req.Date.Format("2006-01-02")
+		// Iterate through each day in the range
+		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+			// Get Day ID (Monday=1, Sunday=7)
+			weekday := d.Weekday()
+			dayID := int(weekday)
+			if dayID == 0 {
+				dayID = 7
+			}
 
-		// Parse Request Times if Partial Day
-		// reqDateStr := req.Date.Format("2006-01-02") // already defined above
+			// Get Schedules for Class & Day
+			schedules, err := s.masterRepo.GetSchedules(strconv.Itoa(int(*user.ClassID)), "", dayID)
+			if err != nil {
+				continue // Skip if error fetching schedules for this day
+			}
 
-		for _, schedule := range schedules {
-			// FILTER LOGIC FOR PARTIAL DAY (Subject-Based)
-			if !req.IsFullDay {
-				found := false
-				for _, reqSched := range req.Schedules {
-					if reqSched.ID == schedule.ID {
-						found = true
-						break
+			currDateStr := d.Format("2006-01-02")
+
+			// Determine which schedules apply for this day
+			applicableSchedules := schedules
+			if !req.IsFullDay && d.Format("2006-01-02") == req.Date.Format("2006-01-02") {
+				// Mid-day logic: Find targeted schedules
+				targetSchedIDs := make(map[uint]bool)
+				var latestStartTime string
+
+				for _, rs := range req.Schedules {
+					targetSchedIDs[rs.ID] = true
+					// Find the latest start time among explicitly selected schedules
+					for _, s := range schedules {
+						if s.ID == rs.ID && s.TimeSlot.ID > 0 {
+							if latestStartTime == "" || s.TimeSlot.StartTime > latestStartTime {
+								latestStartTime = s.TimeSlot.StartTime
+							}
+						}
 					}
 				}
-				if !found {
-					continue
+
+				// If it's sickness OR auto-mark-upcoming is chosen, take everything after the first targeted lesson
+				if req.RequestType == "sakit" || req.AutoMarkUpcoming {
+					var firstTargetStartTime string
+					for _, rs := range req.Schedules {
+						for _, s := range schedules {
+							if s.ID == rs.ID && s.TimeSlot.ID > 0 {
+								if firstTargetStartTime == "" || s.TimeSlot.StartTime < firstTargetStartTime {
+									firstTargetStartTime = s.TimeSlot.StartTime
+								}
+							}
+						}
+					}
+
+					applicableSchedules = []models.Schedule{}
+					for _, s := range schedules {
+						if s.TimeSlot.ID > 0 && s.TimeSlot.StartTime >= firstTargetStartTime {
+							applicableSchedules = append(applicableSchedules, s)
+						}
+					}
+				} else {
+					// Only the explicitly selected schedules
+					applicableSchedules = []models.Schedule{}
+					for _, s := range schedules {
+						if targetSchedIDs[s.ID] {
+							applicableSchedules = append(applicableSchedules, s)
+						}
+					}
 				}
 			}
 
-			// Check if attendance exists
-			existing, err := s.attendRepo.FindByStudentAndSchedule(req.StudentID, schedule.ID, reqDateStr)
+			for _, schedule := range applicableSchedules {
+				// Check if attendance exists
+				existing, err := s.attendRepo.FindByStudentAndSchedule(req.StudentID, schedule.ID, currDateStr)
 
-			status := models.AttendanceStatus(req.RequestType) // sakit, izin
+				attendStatus := models.AttendanceStatus(req.RequestType)
 
-			if err == nil && existing.ID != 0 {
-				// Update existing
-				s.attendRepo.UpdateStatus(existing.ID, status, req.Reason, req.ReviewedAt)
-			} else {
-				// Create new
-				schedID := schedule.ID
-				newAttendance := models.Attendance{
-					StudentID:  req.StudentID,
-					ScheduleID: &schedID,
-					Date:       req.Date,
-					Status:     status,
-					ApprovedAt: req.ReviewedAt,
-					Notes:      req.Reason,
+				if err == nil && existing.ID != 0 {
+					// CRITICAL: Mid-day refinement. If we already marked them as 'hadir',
+					// we only update it if this schedule is within our "applicable" range today.
+					// The loop already only iterates over applicableSchedules.
+					s.attendRepo.UpdateStatus(existing.ID, attendStatus, req.Reason, req.ReviewedAt)
+				} else {
+					// Create new
+					schedID := schedule.ID
+					newAttendance := models.Attendance{
+						StudentID:  req.StudentID,
+						ClassID:    *user.ClassID,
+						ScheduleID: &schedID,
+						Date:       d,
+						Status:     attendStatus,
+						ApprovedAt: req.ReviewedAt,
+						Notes:      req.Reason,
+					}
+					s.attendRepo.Create(&newAttendance)
 				}
-				s.attendRepo.Create(&newAttendance)
 			}
 		}
 	}
@@ -183,7 +238,11 @@ func (s *requestService) ReviewRequest(requestID uint, status string, reviewerID
 			statusLabel = "Ditolak"
 		}
 		title := "Status Pengajuan Izin/Sakit"
-		msg := "Permintaan " + req.RequestType + " Anda untuk tanggal " + req.Date.Format("2006-01-02") + " telah " + statusLabel
+		dateStr := req.Date.Format("2006-01-02")
+		if req.EndDate != nil && req.EndDate.Format("2006-01-02") != dateStr {
+			dateStr = dateStr + " s/d " + req.EndDate.Format("2006-01-02")
+		}
+		msg := "Permintaan " + req.RequestType + " Anda untuk tanggal " + dateStr + " telah " + statusLabel
 		s.notifService.NotifyUser(req.StudentID, title, msg)
 	}()
 

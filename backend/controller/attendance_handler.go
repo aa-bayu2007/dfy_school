@@ -29,7 +29,9 @@ func (h *AttendanceHandler) Scan(c *gin.Context) {
 	}
 
 	var input struct {
-		QRCode string `json:"qr_code" binding:"required"`
+		QRCode    string `json:"qr_code" binding:"required"`
+		ScannerID uint   `json:"scanner_id"` // can be overridden by body if needed, but we use context
+		Force     bool   `json:"force"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -37,7 +39,7 @@ func (h *AttendanceHandler) Scan(c *gin.Context) {
 		return
 	}
 
-	result, err := h.attendService.ScanQR(input.QRCode, scannerID)
+	result, err := h.attendService.ScanQR(input.QRCode, scannerID, input.Force)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
