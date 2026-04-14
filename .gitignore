@@ -25,3 +25,6 @@ dist-ssr
 
 # Frontend build output
 frontend/build_output.txt
+
+# Implementation plans
+plans/
