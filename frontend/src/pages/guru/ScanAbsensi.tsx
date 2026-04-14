@@ -29,6 +29,14 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
 
+interface GroupedStudent {
+  id: number;
+  name: string;
+  time: string;
+  status: string;
+  scannedAt?: string;
+}
+
 export default function ScanAbsensi() {
   const { user, profile } = useAuth();
   const [scanning, setScanning] = useState(false);
@@ -56,7 +64,7 @@ export default function ScanAbsensi() {
   const groupedStudents = useMemo(() => {
     if (!attendances) return [];
 
-    const map = new Map<number, any>();
+    const map = new Map<number, GroupedStudent>();
 
     attendances.forEach(att => {
       const studentId = att.student?.id;
@@ -263,7 +271,7 @@ export default function ScanAbsensi() {
     return () => {
       mounted = false;
     };
-  }, [scanning, selectedCameraId]); // Removed recordAttendance and user?.id to prevent re-render loop
+  }, [scanning, selectedCameraId, recordAttendance, refetchHistory, user?.id]);
 
   const startScanning = () => setScanning(true);
   const stopScanning = () => setScanning(false);
