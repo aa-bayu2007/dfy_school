@@ -82,6 +82,8 @@ func SetupRoutes(
 				admin.DELETE("/schedules", adminH.ResetSchedules)
 
 				admin.POST("/users", adminH.CreateUser)
+				admin.DELETE("/users/bulk", adminH.BulkDeleteUsers)
+				admin.PATCH("/users/bulk", adminH.BulkUpdateUsers)
 				admin.PUT("/users/:id/role", adminH.UpdateUserRole)
 				admin.PUT("/users/:id/class", adminH.UpdateUserClass)
 			}

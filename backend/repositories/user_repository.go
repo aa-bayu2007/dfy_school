@@ -14,6 +14,7 @@ type UserRepository interface {
 	GetAllUsers() ([]models.User, error)
 	FindUsersByRole(roleName string) ([]models.User, error)
 	GetStudentsByClass(classID uint) ([]models.User, error)
+	BulkDelete(ids []uint) error
 	GetDB() *gorm.DB
 }
 
@@ -23,6 +24,20 @@ type userRepository struct {
 
 func NewUserRepository(db *gorm.DB) UserRepository {
 	return &userRepository{db}
+}
+
+func (r *userRepository) BulkDelete(ids []uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete profiles first if needed, but GORM should handle it if set correctly
+		// However, it's safer to delete explicitly or use Cascading delete if configured in DB
+		if err := tx.Where("user_id IN ?", ids).Delete(&models.Profile{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.User{}, ids).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (r *userRepository) Create(user *models.User) error {

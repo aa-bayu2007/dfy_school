@@ -89,8 +89,20 @@ class ApiClient {
         });
     }
 
-    delete<T>(endpoint: string, options?: RequestInit) {
-        return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+    patch<T>(endpoint: string, body?: unknown, options?: RequestInit) {
+        return this.request<T>(endpoint, {
+            ...options,
+            method: 'PATCH',
+            body: body instanceof FormData ? body : JSON.stringify(body),
+        });
+    }
+
+    delete<T>(endpoint: string, body?: unknown, options?: RequestInit) {
+        return this.request<T>(endpoint, {
+            ...options,
+            method: 'DELETE',
+            body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
+        });
     }
 }
 
