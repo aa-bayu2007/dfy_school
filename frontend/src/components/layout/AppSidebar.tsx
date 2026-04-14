@@ -53,7 +53,6 @@ const menuItems = {
   ],
   guru: [
     { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-    { title: 'Scan Absensi', url: '/dashboard/scan', icon: ScanLine },
     { title: 'Jadwal Mengajar', url: '/dashboard/jadwal', icon: Calendar },
     { title: 'Rekap Absensi', url: '/dashboard/rekap', icon: ClipboardList },
     { title: 'Permintaan Izin', url: '/dashboard/review-izin', icon: FileText },

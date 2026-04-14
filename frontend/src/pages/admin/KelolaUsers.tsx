@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Users,
   UserCog,
@@ -32,6 +33,9 @@ import {
   FileUp,
   Download,
   Plus,
+  Trash2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import {
   Dialog,
@@ -62,10 +66,16 @@ interface BackendUser {
 export default function KelolaUsers() {
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<BackendUser | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [activeTab, setActiveTab] = useState('student');
   const [selectedRole, setSelectedRole] = useState<AppRole>('murid');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
+  const [bulkEditData, setBulkEditData] = useState({
+    role: '',
+    class_id: ''
+  });
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [showPromoteDialog, setShowPromoteDialog] = useState(false);
   const [selectedPromoStudent, setSelectedPromoStudent] = useState<string>('');
@@ -198,6 +208,73 @@ export default function KelolaUsers() {
       toast.error(error.message);
     },
   });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (userIds: number[]) => {
+      return apiClient.delete('/admin/users/bulk', { user_ids: userIds });
+    },
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['all-profiles'] });
+      setSelectedUserIds([]);
+      toast.success(res.message || 'Pengguna berhasil dihapus!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Gagal menghapus pengguna');
+    },
+  });
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async ({ userIds, role, classId }: { userIds: number[]; role?: string; classId?: number | null }) => {
+      const payload: any = { user_ids: userIds };
+      if (role) payload.role = role;
+      if (classId !== undefined) payload.class_id = classId;
+      return apiClient.patch('/admin/users/bulk', payload);
+    },
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['all-profiles'] });
+      setSelectedUserIds([]);
+      setBulkEditDialogOpen(false);
+      setBulkEditData({ role: '', class_id: '' });
+      toast.success(res.message || 'Pengguna berhasil diupdate!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Gagal mengupdate pengguna');
+    },
+  });
+
+  const toggleUserSelection = (userId: number) => {
+    setSelectedUserIds(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedUserIds.length === 0) return;
+
+    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedUserIds.length} pengguna terpilih?`)) {
+      bulkDeleteMutation.mutate(selectedUserIds);
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedUserIds.length === 0) return;
+    if (!bulkEditData.role && !bulkEditData.class_id) {
+      toast.error('Pilih setidaknya satu kolom untuk diupdate');
+      return;
+    }
+
+    const payload: { userIds: number[]; role?: string; classId?: number | null } = {
+      userIds: selectedUserIds
+    };
+    if (bulkEditData.role) payload.role = bulkEditData.role;
+    if (bulkEditData.class_id) {
+      payload.classId = bulkEditData.class_id === 'none' ? 0 : parseInt(bulkEditData.class_id);
+    }
+
+    await bulkUpdateMutation.mutateAsync(payload);
+  };
 
   const getUserRole = (user: BackendUser): AppRole => {
     // Validate if the role string matches AppRole, otherwise default
@@ -403,8 +480,55 @@ export default function KelolaUsers() {
             const startIndex = (currentPage - 1) * itemsPerPage;
             const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
 
+            const allPaginatedSelected = paginatedUsers.length > 0 && paginatedUsers.every(u => selectedUserIds.includes(u.id));
+
             return (
               <TabsContent key={role} value={role} className="mt-6">
+                {selectedUserIds.length > 0 && (
+                  <div className="flex items-center justify-between p-3 mb-4 rounded-xl bg-primary/10 border border-primary/20 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3 ml-2">
+                      <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
+                        {selectedUserIds.length}
+                      </div>
+                      <span className="text-sm font-medium text-primary">Pengguna Terpilih</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedUserIds([])}
+                        className="h-8 text-xs rounded-lg"
+                      >
+                        <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                        Batal
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setBulkEditDialogOpen(true)}
+                        className="h-8 text-xs rounded-lg border-primary/20 hover:bg-primary/10 hover:text-primary transition-all"
+                      >
+                        <UserCog className="h-3.5 w-3.5 mr-1.5" />
+                        Edit Terpilih
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleBulkDelete}
+                        disabled={bulkDeleteMutation.isPending}
+                        className="h-8 text-xs rounded-lg shadow-lg shadow-destructive/20"
+                      >
+                        {bulkDeleteMutation.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Hapus Terpilih
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <Card className="shadow-elegant border-none bg-card/60 backdrop-blur-sm">
                   <CardHeader className="pb-3 px-6">
                     <div className="flex flex-col gap-4">
@@ -576,6 +700,20 @@ export default function KelolaUsers() {
                       <Table>
                         <TableHeader className="bg-muted/50">
                           <TableRow>
+                            <TableHead className="w-[50px] pl-6">
+                              <Checkbox
+                                checked={allPaginatedSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    const pageIds = paginatedUsers.map(u => u.id);
+                                    setSelectedUserIds(prev => Array.from(new Set([...prev, ...pageIds])));
+                                  } else {
+                                    const pageIds = paginatedUsers.map(u => u.id);
+                                    setSelectedUserIds(prev => prev.filter(id => !pageIds.includes(id)));
+                                  }
+                                }}
+                              />
+                            </TableHead>
                             <TableHead className="font-bold">Nama</TableHead>
                             <TableHead className="font-bold">NIS/NIP</TableHead>
                             {role !== 'admin' && <TableHead className="font-bold">{role === 'guru' ? 'Wali Kelas' : 'Kelas'}</TableHead>}
@@ -586,7 +724,13 @@ export default function KelolaUsers() {
                         <TableBody>
                           {paginatedUsers.length > 0 ? (
                             paginatedUsers.map((profile, pIdx) => (
-                              <TableRow key={profile.id || `profile-${role}-${pIdx}`} className="hover:bg-muted/30 transition-colors">
+                              <TableRow key={profile.id || `profile-${role}-${pIdx}`} className={`hover:bg-muted/30 transition-colors ${selectedUserIds.includes(profile.id) ? "bg-primary/5" : ""}`}>
+                                <TableCell className="pl-6">
+                                  <Checkbox
+                                    checked={selectedUserIds.includes(profile.id)}
+                                    onCheckedChange={() => toggleUserSelection(profile.id)}
+                                  />
+                                </TableCell>
                                 <TableCell className="font-semibold py-4">
                                   <div className="flex items-center gap-3">
                                     <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${getRoleBadgeColor(profile.role)}`}>
@@ -618,7 +762,7 @@ export default function KelolaUsers() {
                             ))
                           ) : (
                             <TableRow>
-                              <TableCell colSpan={5} className="h-24 text-center">
+                              <TableCell colSpan={6} className="h-24 text-center">
                                 <div className="flex flex-col items-center justify-center py-6 text-center">
                                   <Users className="h-12 w-12 text-muted-foreground/30 mb-3" />
                                   <p className="text-muted-foreground font-medium">Tidak ada pengguna ditemukan</p>
@@ -728,6 +872,75 @@ export default function KelolaUsers() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkEditDialogOpen} onOpenChange={setBulkEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-primary" />
+              Edit Massal
+            </DialogTitle>
+            <DialogDescription>
+              Ubah role atau kelas untuk {selectedUserIds.length} pengguna terpilih sekaligus.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Role (Opsional)</label>
+              <Select
+                value={bulkEditData.role}
+                onValueChange={(v) => setBulkEditData({ ...bulkEditData, role: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih role untuk semua" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="murid">Murid</SelectItem>
+                  <SelectItem value="ketua_kelas">Ketua Kelas</SelectItem>
+                  <SelectItem value="guru">Guru</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground italic">Kosongkan jika tidak ingin mengubah role</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Kelas (Opsional)</label>
+              <Select
+                value={bulkEditData.class_id}
+                onValueChange={(v) => setBulkEditData({ ...bulkEditData, class_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih kelas untuk semua" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Tidak ada kelas</SelectItem>
+                  {classes?.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id?.toString() || ""}>
+                      {cls.name} - {cls.grade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground italic">Kosongkan jika tidak ingin mengubah kelas</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkEditDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleBulkUpdate}
+              disabled={bulkUpdateMutation.isPending}
+              className="gradient-primary"
+            >
+              {bulkUpdateMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Update Semua
             </Button>
           </DialogFooter>
         </DialogContent>

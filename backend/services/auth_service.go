@@ -23,6 +23,8 @@ type AuthService interface {
 	CreateUser(user *models.User, profile *models.Profile) error
 	ImportStudents(students []StudentImportData) error
 	GetStudentsByClass(classID uint) ([]models.User, error)
+	BulkDeleteUsers(ids []uint) error
+	BulkUpdateUsers(ids []uint, role *string, classID *uint) error
 }
 
 type StudentImportData struct {
@@ -346,4 +348,66 @@ func (s *authService) ImportStudents(students []StudentImportData) error {
 
 func (s *authService) GetStudentsByClass(classID uint) ([]models.User, error) {
 	return s.userRepo.GetStudentsByClass(classID)
+}
+
+func (s *authService) BulkDeleteUsers(ids []uint) error {
+	return s.userRepo.BulkDelete(ids)
+}
+
+func (s *authService) BulkUpdateUsers(ids []uint, role *string, classID *uint) error {
+	tx := s.userRepo.GetDB().Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	for _, id := range ids {
+		updates := make(map[string]interface{})
+		if role != nil {
+			updates["role"] = *role
+		}
+		if classID != nil {
+			// If classID is 0, it means "No Class"
+			if *classID == 0 {
+				updates["class_id"] = nil
+			} else {
+				updates["class_id"] = *classID
+			}
+		}
+
+		if len(updates) > 0 {
+			var user models.User
+			if err := tx.First(&user, id).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			if err := tx.Model(&user).Updates(updates).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			// Handle Wali Kelas logic if role is guru or class is changed for a guru
+			finalRole := user.Role
+			if role != nil {
+				finalRole = *role
+			}
+
+			if finalRole == "guru" && classID != nil {
+				// Clear old assignments for this teacher
+				if err := tx.Model(&models.Class{}).Where("teacher_id = ?", id).Update("teacher_id", nil).Error; err != nil {
+					tx.Rollback()
+					return err
+				}
+				// Set new assignment
+				if *classID != 0 {
+					if err := tx.Model(&models.Class{}).Where("id = ?", *classID).Update("teacher_id", id).Error; err != nil {
+						tx.Rollback()
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	return tx.Commit().Error
 }

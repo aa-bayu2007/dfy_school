@@ -189,6 +189,52 @@ func (h *AdminHandler) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success(gin.H{"message": "User created successfully", "user_id": user.ID}))
 }
 
+func (h *AdminHandler) BulkDeleteUsers(c *gin.Context) {
+	var req struct {
+		UserIDs []uint `json:"user_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("Invalid input: "+err.Error()))
+		return
+	}
+
+	if len(req.UserIDs) == 0 {
+		c.JSON(http.StatusBadRequest, response.Error("No user IDs provided"))
+		return
+	}
+
+	if err := h.authService.BulkDeleteUsers(req.UserIDs); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Failed to delete users: "+err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(gin.H{"message": strconv.Itoa(len(req.UserIDs)) + " users deleted successfully"}))
+}
+
+func (h *AdminHandler) BulkUpdateUsers(c *gin.Context) {
+	var req struct {
+		UserIDs []uint  `json:"user_ids" binding:"required"`
+		Role    *string `json:"role"`
+		ClassID *uint   `json:"class_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("Invalid input: "+err.Error()))
+		return
+	}
+
+	if len(req.UserIDs) == 0 {
+		c.JSON(http.StatusBadRequest, response.Error("No user IDs provided"))
+		return
+	}
+
+	if err := h.authService.BulkUpdateUsers(req.UserIDs, req.Role, req.ClassID); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Failed to update users: "+err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(gin.H{"message": strconv.Itoa(len(req.UserIDs)) + " users updated successfully"}))
+}
+
 func (h *AdminHandler) CreateClass(c *gin.Context) {
 	var input struct {
 		Grade     string `json:"grade" binding:"required"`

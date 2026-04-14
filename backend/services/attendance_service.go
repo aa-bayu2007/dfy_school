@@ -69,76 +69,51 @@ func (s *attendanceService) ScanQR(qrCode string, scannerID uint, force bool) (m
 	// Assuming FindByID preloads.
 	student, err := s.userRepo.FindByID(uint(studentID))
 	if err != nil {
-		return nil, errors.New("Siswa tidak ditemukan")
+		fmt.Printf("[ScanQR] Error: Student ID %d not found in DB\n", studentID)
+		return nil, errors.New("Siswa tidak ditemukan di database")
 	}
 
 	// VALIDATION: Strict check
 	if student.Name != qrName {
-		return nil, errors.New("Nama dalam QR tidak sesuai dengan database")
+		fmt.Printf("[ScanQR] Error: Name mismatch. DB=%s, QR=%s\n", student.Name, qrName)
+		return nil, errors.New(fmt.Sprintf("Nama tidak sesuai. DB: %s, QR: %s", student.Name, qrName))
 	}
 
 	if student.Profile != nil && student.Profile.NIS != qrNIS {
-		// Validasi NIS jika ada profile
-		return nil, errors.New("NIS dalam QR tidak sesuai dengan database")
+		fmt.Printf("[ScanQR] Error: NIS mismatch. DB=%s, QR=%s\n", student.Profile.NIS, qrNIS)
+		return nil, errors.New(fmt.Sprintf("NIS tidak sesuai. DB: %s, QR: %s", student.Profile.NIS, qrNIS))
 	}
 
 	if student.Class != nil {
 		if student.Class.Name != qrClassName {
-			return nil, errors.New("Kelas dalam QR tidak sesuai (Siswa mungkin pindah kelas)")
+			fmt.Printf("[ScanQR] Error: Class mismatch. DB=%s, QR=%s\n", student.Class.Name, qrClassName)
+			return nil, errors.New(fmt.Sprintf("Kelas tidak sesuai. DB: %s, QR: %s", student.Class.Name, qrClassName))
 		}
 	} else {
 		if qrClassName != "N/A" && qrClassName != "" {
-			return nil, errors.New("Siswa tidak memiliki kelas di database, tapi QR memiliki kelas")
+			fmt.Printf("[ScanQR] Error: Student has NO Class in DB, but QR says Class=%s\n", qrClassName)
+			return nil, errors.New("Siswa belum terdaftar dalam kelas di database")
 		}
 	}
 
-	// Security check: Scanner can only scan students from their own class or assigned class
+	// Security check: ONLY Ketua Kelas (KM) can scan
 	scanner, err := s.userRepo.FindByID(scannerID)
 	if err == nil && scanner != nil {
-		switch scanner.Role {
-		case "admin":
-			// Admin can scan anyone, no restriction
-		case "teacher", "guru":
-			// Guru can ONLY scan if they are the Homeroom Teacher (Wali Kelas) of the student's class
-			if student.ClassID == nil {
-				return nil, errors.New("Siswa tidak memiliki kelas, tidak bisa discan oleh Guru")
-			}
+		if scanner.Role != "ketua_kelas" {
+			return nil, errors.New("Akses ditolak. Fitur scan hanya tersedia untuk Ketua Kelas (KM)")
+		}
 
-			// Method 1: Check Preloaded Class (Preferred)
-			if student.Class != nil {
-				if student.Class.TeacherID == nil || *student.Class.TeacherID != scanner.ID {
-					return nil, errors.New("Anda bukan Wali Kelas dari siswa ini")
-				}
-			} else {
-				// Fallback if Preload failed or inconsistent (Check DB directly)
-				class, err := s.masterRepo.FindClassByID(*student.ClassID)
-				if err != nil {
-					return nil, errors.New("Kelas siswa tidak ditemukan")
-				}
-				if class.TeacherID == nil || *class.TeacherID != scanner.ID {
-					return nil, errors.New("Anda bukan Wali Kelas dari siswa ini")
-				}
-			}
-		case "ketua_kelas":
-			// Ketua Kelas can ONLY scan students in their OWN class
-			if scanner.ClassID == nil {
-				return nil, errors.New("Anda (Ketua Kelas) tidak memiliki kelas assignments")
-			}
-			if student.ClassID == nil {
-				return nil, errors.New("Siswa tidak memiliki kelas")
-			}
+		// Ketua Kelas can ONLY scan students in their OWN class
+		if scanner.ClassID == nil {
+			return nil, errors.New("Anda (Ketua Kelas) tidak memiliki kelas assignments")
+		}
+		if student.ClassID == nil {
+			return nil, errors.New("Siswa yang discan tidak memiliki kelas")
+		}
 
-			// Check Class IDs
-			if *scanner.ClassID != *student.ClassID {
-				return nil, errors.New("Siswa bukan dari kelas Anda")
-			}
-		default:
-			// Others (Murid scanning themselves?)
-			// If Murid scans themselves?
-			// Check if scanner.ID == student.ID
-			if scanner.ID != uint(studentID) {
-				return nil, errors.New("Anda hanya bisa scan QR Anda sendiri (atau minta Wali Kelas/Ketua Kelas)")
-			}
+		// Check Class IDs
+		if *scanner.ClassID != *student.ClassID {
+			return nil, errors.New("Siswa ini bukan dari kelas Anda")
 		}
 	} else {
 		return nil, errors.New("Scanner invalid")

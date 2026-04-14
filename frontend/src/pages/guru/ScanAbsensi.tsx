@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRecordAttendance, useAttendance, useManualAttendance } from '@/hooks/useAttendance';
 import { useStudents } from '@/hooks/useStudents';
@@ -52,40 +52,44 @@ export default function ScanAbsensi() {
     user?.id
   );
 
-  // Derived history from persistent attendance records - sorted latest first
-  // Deduplicate by student ID (or name if ID missing), keeping the LATEST record
-  const scannedStudents = (() => {
+  // Group attendance records by student ID to prevent duplicates in the UI
+  const groupedStudents = useMemo(() => {
     if (!attendances) return [];
 
-    const uniqueMap = new Map();
-    // Sort by scanned_at descending first to ensure we process latest first
-    const sorted = [...attendances].sort((a, b) => new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime());
+    const map = new Map<number, any>();
 
-    sorted.forEach(att => {
-      const key = att.student?.id || att.student?.full_name || att.student_id; // Prefer ID
-      if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, att);
+    attendances.forEach(att => {
+      const studentId = att.student?.id;
+      if (!studentId) return;
+
+      // If student not in map, or this record is newer, update it
+      const existing = map.get(studentId);
+      if (!existing || new Date(att.scanned_at || 0) > new Date(existing.scanned_at || 0)) {
+        let statusLabel = '';
+        if (att.status === 'hadir') {
+          statusLabel = '(Hadir)';
+        } else if (att.status === 'izin' || att.status === 'sakit') {
+          const timeStr = att.approved_at
+            ? new Date(att.approved_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+            : '';
+          statusLabel = `(${att.status === 'izin' ? 'Izin' : 'Sakit'}${timeStr ? ' pd jam ' + timeStr : ''})`;
+        }
+
+        map.set(studentId, {
+          id: studentId,
+          name: `${att.student?.full_name || att.student?.name || 'Siswa'} ${statusLabel}`,
+          time: att.scanned_at ? new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+          status: att.status,
+          scannedAt: att.scanned_at
+        });
       }
     });
 
-    return Array.from(uniqueMap.values()).map(att => {
-      let statusLabel = '';
-      if (att.status === 'hadir') {
-        statusLabel = '(Hadir)';
-      } else if (att.status === 'izin' || att.status === 'sakit') {
-        const timeStr = att.approved_at
-          ? new Date(att.approved_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-          : '';
-        statusLabel = `(${att.status === 'izin' ? 'Izin' : 'Sakit'}${timeStr ? ' pd jam ' + timeStr : ''})`;
-      }
-
-      return {
-        name: `${att.student?.full_name || att.student?.name || 'Siswa'} ${statusLabel}`,
-        time: att.scanned_at ? new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
-        status: att.status as 'hadir' | 'sakit' | 'izin' | 'alpha' | 'pending' | 'success' | 'error'
-      };
-    });
-  })();
+    // Return as array sorted by latest scan
+    return Array.from(map.values()).sort((a, b) => 
+      new Date(b.scannedAt || 0).getTime() - new Date(a.scannedAt || 0).getTime()
+    );
+  }, [attendances]);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedCodesRef = useRef<Set<string>>(new Set());
@@ -157,25 +161,24 @@ export default function ScanAbsensi() {
         const scanner = new Html5Qrcode('qr-reader', false);
         scannerRef.current = scanner;
 
+        // Simplify config for maximum compatibility
+        // Passing specific constraints while using deviceId often causes silent freezes
+        const config = {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        };
+
         await scanner.start(
-          selectedCameraId, // Use specific device ID instead of generic facingMode
-          {
-            fps: 15,
-            qrbox: { width: 280, height: 280 },
-            aspectRatio: 1.0,
-            // Try to get a decent resolution if available
-            videoConstraints: {
-              width: { min: 640, ideal: 1280, max: 1920 },
-              height: { min: 480, ideal: 720, max: 1080 },
-              facingMode: "environment"
-            }
-          },
+          selectedCameraId,
+          config,
           async (decodedText) => {
             if (!mounted) return;
-            console.log("QR Decoded Raw:", decodedText);
+            console.log("✅ QR DETECTED:", decodedText);
 
             // Prevent duplicate scans in session
             if (scannedCodesRef.current.has(decodedText)) {
+              console.log("ℹ️ Duplicate scan blocked for:", decodedText);
               if (scannerRef.current) await scannerRef.current.pause(true);
               toast.info("Siswa ini sudah diabsen barusan.");
               setScanStatus('success'); // Show green briefly for feedback that it was read
@@ -507,28 +510,28 @@ export default function ScanAbsensi() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Riwayat Scan Sesi Ini</span>
-              <Badge variant="secondary">{scannedStudents.filter(s => s.status === 'success').length} siswa</Badge>
+              <Badge variant="secondary">{groupedStudents.length} siswa</Badge>
             </CardTitle>
             <CardDescription>
-              Daftar siswa yang sudah diabsen hari ini
+              Daftar siswa unik yang sudah discan hari ini
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {scannedStudents.length > 0 ? (
+            {groupedStudents.length > 0 ? (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {scannedStudents.map((student, index) => (
+                {groupedStudents.map((student, index) => (
                   <div
-                    key={index}
+                    key={student.id || index}
                     className={cn(
                       "flex items-center justify-between p-3 rounded-lg animate-fade-in transition-all border",
-                      student.status === 'hadir' || student.status === 'success' ? "bg-success/10 border-success/20 text-success" :
+                      student.status === 'hadir' ? "bg-success/10 border-success/20 text-success" :
                         student.status === 'izin' ? "bg-amber-500/10 border-amber-500/20 text-amber-500" :
-                          student.status === 'sakit' || student.status === 'error' ? "bg-destructive/10 border-destructive/20 text-destructive" :
+                          student.status === 'sakit' ? "bg-destructive/10 border-destructive/20 text-destructive" :
                             "bg-muted border-transparent"
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      {(student.status === 'hadir' || student.status === 'success') ? (
+                      {student.status === 'hadir' ? (
                         <CheckCircle className="h-5 w-5" />
                       ) : student.status === 'izin' ? (
                         <Clock className="h-5 w-5" />
